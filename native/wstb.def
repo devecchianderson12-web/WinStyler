@@ -1,0 +1,5 @@
+LIBRARY wstb
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE
+    Keep

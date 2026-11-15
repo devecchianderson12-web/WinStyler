@@ -20,8 +20,13 @@ Fondo de la barra (pestaña Efectos)
 
 Apariencia del menú Inicio (pestaña Inicio) [Windows 11]
 - Fondo: Transparente, Translúcido, Color sólido, Degradado o Predeterminado.
-- Esquinas redondeadas, ancho y alto (solo para achicarlo: la ventana del menú
-  no puede crecer), sombra, borde, cuadro de búsqueda y «Recomendado».
+- Esquinas redondeadas, Tamaño (comprime todo el menú, sin recortar), Alto
+  (lo acorta), sombra, borde, cuadro de búsqueda y «Recomendado». Ninguno puede
+  agrandarlo: la ventana del menú no crece.
+- El color también se aplica a las demás superficies acrílicas del menú
+  (carpeta abierta, «Todas»).
+- El panel de resultados de búsqueda es otra aplicación (SearchHost, hecha con
+  contenido web) y no se puede teñir.
 - Se ve la próxima vez que abras el menú.
 
 Cómo funcionan los efectos

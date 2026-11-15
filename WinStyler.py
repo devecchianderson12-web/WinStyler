@@ -240,7 +240,7 @@ def effective(cfg, style):
     if seff in ("transparent", "translucent", "solid", "gradient"):
         e["fg"] = (255, 255, 255) if lum(mix(wall(PW / 2, PW, 0.5), e["base"], e["alpha"])) < 140 else (20, 20, 20)
     e["sm_corner"] = cfg.get("sm_corner")
-    e["sm_w"], e["sm_h"] = cfg.get("sm_width"), cfg.get("sm_height")
+    e["sm_k"], e["sm_h"] = (cfg.get("sm_scale") or 100) / 100.0, cfg.get("sm_height")
     e["sm_search"] = cfg.get("sm_search", "keep") != "hide"
     e["sm_shadow"] = cfg.get("sm_shadow", "keep") == "show" or (cfg.get("sm_shadow", "keep") == "keep" and seff != "transparent")
     e["sm_border"] = cfg.get("sm_border", "keep") != "hide" and seff != "transparent"
@@ -327,7 +327,13 @@ def paint(c, cfg, style, show_start, W=PW, H=PH):
     if show_start:
         bottom = y0 - 10
         if win11:
+            last = (c.find_all() or (0,))[-1]
             _start11(c, e, W, bottom)
+            if e["sm_k"] < 1.0:
+                cx = (W / 2.0) if e["align"] != "left" else 8
+                for item in c.find_all():
+                    if item > last:
+                        c.scale(item, cx, bottom, e["sm_k"], e["sm_k"])
         else:
             _start10(c, e, W, bottom - 2)
 
@@ -440,8 +446,6 @@ def _start11(c, e, W, bottom):
     rec_h = 0 if e["hide_rec"] else 24 + ((nrec + 1) // 2) * 34
     top = 0 if e["sm_search"] else -34
     pw = 380
-    if e["sm_w"]:
-        pw = int(380 * min(1.0, e["sm_w"] / 642.0))
     ph = 80 + top + rows * 58 + rec_h + 56
     if e["sm_h"]:
         ph = min(ph, int(ph * min(1.0, e["sm_h"] / 726.0)) + 40)
@@ -1237,11 +1241,11 @@ class App:
         self.kn_sm_opacity = Knob(row, "Opacidad", 0, 100, 60, "{} %", command=self.refresh, size=62)
         self.kn_sm_corner = Knob(row, "Esquinas", 0, 32, 8, "{} px", optional=True, active=False,
                                  command=self.refresh, size=62)
-        self.kn_sm_width = Knob(row, "Ancho", 360, 800, 642, "{} px", step=10, optional=True, active=False,
+        self.kn_sm_scale = Knob(row, "Tamaño", 50, 100, 85, "{} %", step=1, optional=True, active=False,
                                 command=self.refresh, size=62)
         self.kn_sm_height = Knob(row, "Alto", 360, 900, 726, "{} px", step=10, optional=True, active=False,
                                  command=self.refresh, size=62)
-        for k in (self.kn_sm_opacity, self.kn_sm_corner, self.kn_sm_width, self.kn_sm_height):
+        for k in (self.kn_sm_opacity, self.kn_sm_corner, self.kn_sm_scale, self.kn_sm_height):
             k.pack(side="left", padx=(0, 2))
         p.full(row)
         l1 = tk.Frame(p.body, bg=PANEL)
@@ -1258,8 +1262,9 @@ class App:
             self._choice(p, k)
         p.full(self._btnrow(p.body, [("Modo compacto", lambda: self.preset(COMPACT))]))
         p.note("Lo aplica el mismo módulo del efecto de barra (Windows 11); se ve la próxima vez que abras el menú. "
-               "La opacidad se usa en «Translúcido». Ancho y alto solo pueden achicar el menú: Windows no deja "
-               "que su ventana crezca. Doble clic en una perilla con LED para activarla o dejarla sin cambio.")
+               "La opacidad se usa en «Translúcido». «Tamaño» comprime todo el menú (sin recortar) y «Alto» lo "
+               "acorta; ninguno puede agrandarlo porque Windows no deja que su ventana crezca. El panel de búsqueda "
+               "es otra aplicación de Windows (SearchHost) y no se puede teñir. Doble clic en una perilla con LED para activarla o dejarla sin cambio.")
 
         p = Panel(f, "Menú Inicio")
         p.pack(fill="x", pady=(0, 12))
@@ -1357,7 +1362,7 @@ class App:
         cfg["sm_tint"] = self.sm_tint
         cfg["sm_tint2"] = self.sm_tint2
         cfg["sm_corner"] = self.kn_sm_corner.get()
-        cfg["sm_width"] = self.kn_sm_width.get()
+        cfg["sm_scale"] = self.kn_sm_scale.get()
         cfg["sm_height"] = self.kn_sm_height.get()
         cfg["tb_hover_ms"] = self.kn_hover.get()
         cfg["menu_delay"] = self.kn_menu.get()
@@ -1381,7 +1386,7 @@ class App:
         self.tg_sm_tint.set(cfg.get("sm_tint_on", False))
         self.kn_sm_opacity.set(cfg.get("sm_opacity", 60))
         self.kn_sm_corner.set(cfg.get("sm_corner"))
-        self.kn_sm_width.set(cfg.get("sm_width"))
+        self.kn_sm_scale.set(cfg.get("sm_scale"))
         self.kn_sm_height.set(cfg.get("sm_height"))
         self.kn_hover.set(cfg.get("tb_hover_ms"))
         self.kn_menu.set(cfg.get("menu_delay"))

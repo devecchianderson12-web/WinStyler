@@ -6,7 +6,7 @@
 // Uso: rundll32.exe wstb.dll,Keep   (proceso residente que mantiene los efectos)
 // Configuración (DWORD) en HKCU\Software\WinStyler:
 //   Barra: TbEnabled, TbOpacity (0-100), TbTint, TbTint2, TbStroke
-//   Inicio: SmEnabled, SmOpacity, SmTint, SmTint2, SmCorner, SmWidth, SmHeight,
+//   Inicio: SmEnabled, SmOpacity, SmTint, SmTint2, SmCorner, SmScale (%), SmHeight,
 //           SmShadow, SmBorder, SmSearch, SmRec
 //   Colores 0x00RRGGBB; 0xFFFFFFFF = sin cambio / color de Windows.
 #define WIN32_LEAN_AND_MEAN
@@ -58,7 +58,7 @@ struct Cfg {
 
 struct SmCfg {
     DWORD enabled = 0, opacity = 100, tint = NO_TINT, tint2 = NO_TINT, corner = NO_TINT;
-    DWORD width = 0, height = 0, shadow = 1, border = 1, search = 1, rec = 1;
+    DWORD scale = 0, height = 0, shadow = 1, border = 1, search = 1, rec = 1;
 };
 
 static DWORD RegDw(const wchar_t* name, DWORD def) {
@@ -85,7 +85,7 @@ static SmCfg ReadSmCfg() {
     c.tint = RegDw(L"SmTint", NO_TINT);
     c.tint2 = RegDw(L"SmTint2", NO_TINT);
     c.corner = RegDw(L"SmCorner", NO_TINT);
-    c.width = RegDw(L"SmWidth", 0);
+    c.scale = RegDw(L"SmScale", 0);
     c.height = RegDw(L"SmHeight", 0);
     c.shadow = RegDw(L"SmShadow", 1);
     c.border = RegDw(L"SmBorder", 1);
@@ -99,15 +99,21 @@ static winrt::Windows::UI::Color Col(DWORD rgb) {
 }
 
 // Pincel sólido o degradado (de tint a tint2).
-static wuxm::Brush MakeBrush(DWORD tint, DWORD tint2, bool horizontal) {
-    if (tint2 == NO_TINT) return wuxm::SolidColorBrush(Col(tint));
+static wuxm::Brush MakeBrush(DWORD tint, DWORD tint2, bool horizontal, uint8_t alpha = 255) {
+    if (tint2 == NO_TINT) {
+        auto col = Col(tint);
+        col.A = alpha;
+        return wuxm::SolidColorBrush(col);
+    }
     wuxm::LinearGradientBrush b;
     b.StartPoint({0, 0});
     b.EndPoint(horizontal ? winrt::Windows::Foundation::Point{1, 0} : winrt::Windows::Foundation::Point{1, 1});
     wuxm::GradientStop s1, s2;
-    s1.Color(Col(tint));
+    auto c1 = Col(tint), c2 = Col(tint2);
+    c1.A = c2.A = alpha;
+    s1.Color(c1);
     s1.Offset(0);
-    s2.Color(Col(tint2));
+    s2.Color(c2);
     s2.Offset(1);
     b.GradientStops().Append(s1);
     b.GradientStops().Append(s2);
@@ -172,7 +178,7 @@ static void Reassert(wux::DependencyObject const& sender) {
 }
 
 // ------------------------------------------------------------------ menú Inicio
-enum Role { R_BG, R_OVERLAY, R_FILL, R_SHADOW, R_FRAME, R_SEARCH, R_REC, R_REC_WRAP };
+enum Role { R_BG, R_BG_GEN, R_OVERLAY, R_FILL, R_SHADOW, R_FRAME, R_SEARCH, R_REC, R_REC_WRAP };
 
 struct Saved {
     wux::DependencyProperty dp{nullptr};
@@ -186,9 +192,9 @@ struct SmItem {
     std::vector<Saved> saved;
     wuxm::Brush ours{nullptr};
     unsigned long long ourKey = 0;
-    bool mainFrame = false;      // StartSizingFrame: se recentra con un desplazamiento
-    double origW = 0, origH = 0;  // tamaño original (el menú solo puede achicarse)
-    wuxm::TranslateTransform shift{nullptr};
+    bool mainFrame = false;      // StartSizingFrame: recibe la escala
+    double origH = 0;            // alto original (el menú solo puede achicarse)
+    wuxm::ScaleTransform scale{nullptr};
 };
 
 static std::vector<SmItem> g_sm;
@@ -277,6 +283,33 @@ static void ApplySm(SmItem& it, const SmCfg& c) {
             Restore(it, border, wuxc::Border::BorderThicknessProperty());
         }
         break;
+    case R_BG_GEN: {
+        // Otras superficies (carpeta abierta, Todas las apps...): solo el pincel,
+        // nunca la opacidad, para no ocultar su contenido.
+        wuxm::Brush cur{nullptr};
+        auto panel = target.try_as<wuxc::Panel>();
+        if (border) cur = border.Background();
+        else if (panel) cur = panel.Background();
+        else break;
+        auto dp = border ? wuxc::Border::BackgroundProperty() : wuxc::Panel::BackgroundProperty();
+        if (!bgChange) {
+            it.ours = nullptr;
+            Restore(it, target, dp);
+            break;
+        }
+        DWORD tint = c.tint != NO_TINT ? c.tint : 0x202020;
+        uint8_t alpha = (uint8_t)((c.opacity * 255 + 50) / 100);
+        unsigned long long key = ((unsigned long long)tint << 32) ^ c.tint2 ^ ((unsigned long long)alpha << 56);
+        if (!it.ours || it.ourKey != key) {
+            it.ours = MakeBrush(tint, c.tint2, false, alpha);
+            it.ourKey = key;
+        }
+        if (cur != it.ours) {
+            Remember(it, target, dp);
+            target.SetValue(dp, it.ours);
+        }
+        break;
+    }
     case R_OVERLAY:
     case R_FILL:
         if (ue) {
@@ -300,29 +333,10 @@ static void ApplySm(SmItem& it, const SmCfg& c) {
         break;
     case R_FRAME: {
         auto fe = target.as<wux::FrameworkElement>();
-        if (it.origW == 0 && fe.ActualWidth() > 0 && it.saved.empty()) {
-            it.origW = fe.ActualWidth();
-            it.origH = fe.ActualHeight();
-        }
-        // La ventana del menú tiene el tamaño original: más grande se recortaría.
-        double w = c.width ? (double)c.width : 0, h = c.height ? (double)c.height : 0;
-        if (it.origW > 0) {
-            if (w > it.origW) w = it.origW;
-            if (h > it.origH) h = it.origH;
-        }
-        if (w > 0) {
-            if (fe.MinWidth() != 0) {
-                Remember(it, fe, wux::FrameworkElement::MinWidthProperty());
-                fe.MinWidth(0);
-            }
-            if (fe.Width() != w) {
-                Remember(it, fe, wux::FrameworkElement::WidthProperty());
-                fe.Width(w);
-            }
-        } else {
-            Restore(it, fe, wux::FrameworkElement::WidthProperty());
-            Restore(it, fe, wux::FrameworkElement::MinWidthProperty());
-        }
+        if (it.origH == 0 && fe.ActualHeight() > 0 && it.saved.empty()) it.origH = fe.ActualHeight();
+        // La ventana del menú tiene el alto original: más alto se recortaría.
+        double h = c.height ? (double)c.height : 0;
+        if (it.origH > 0 && h > it.origH) h = it.origH;
         if (h > 0) {
             if (fe.Height() != h) {
                 Remember(it, fe, wux::FrameworkElement::HeightProperty());
@@ -332,16 +346,23 @@ static void ApplySm(SmItem& it, const SmCfg& c) {
             Restore(it, fe, wux::FrameworkElement::HeightProperty());
         }
         if (it.mainFrame) {
-            double dx = (w > 0 && it.origW > 0) ? -(it.origW - w) / 2.0 : 0.0;
-            if (dx != 0.0) {
-                if (!it.shift) it.shift = wuxm::TranslateTransform();
-                if (fe.RenderTransform() != it.shift) {
+            // Tamaño: se comprime todo el menú (escala uniforme) anclado abajo al centro.
+            double k = (c.scale > 0 && c.scale < 100) ? c.scale / 100.0 : 1.0;
+            if (k < 1.0) {
+                if (!it.scale) it.scale = wuxm::ScaleTransform();
+                if (fe.RenderTransform() != it.scale) {
                     Remember(it, fe, wux::UIElement::RenderTransformProperty());
-                    fe.RenderTransform(it.shift);
+                    Remember(it, fe, wux::UIElement::RenderTransformOriginProperty());
+                    fe.RenderTransformOrigin({0.5f, 1.0f});
+                    fe.RenderTransform(it.scale);
                 }
-                if (it.shift.X() != dx) it.shift.X(dx);
+                if (it.scale.ScaleX() != k) {
+                    it.scale.ScaleX(k);
+                    it.scale.ScaleY(k);
+                }
             } else {
                 Restore(it, fe, wux::UIElement::RenderTransformProperty());
+                Restore(it, fe, wux::UIElement::RenderTransformOriginProperty());
             }
         }
         break;
@@ -384,8 +405,6 @@ static bool SmRole(std::wstring_view type, std::wstring_view name, Role& role) {
         {L"StartDocked.StartSizingFrame", L"", R_FRAME},
         {L"StartDocked.StartSizingFramePanel", L"", R_FRAME},
         {L"StartDocked.LauncherFrame", L"", R_FRAME},
-        {L"Windows.UI.Xaml.Controls.Grid", L"RootGrid", R_FRAME},
-        {L"Windows.UI.Xaml.Controls.Grid", L"RootContent", R_FRAME},
         {L"StartDocked.SearchBoxToggleButton", L"StartMenuSearchBox", R_SEARCH},
         {L"Windows.UI.Xaml.Controls.Grid", L"TopLevelSuggestionsListHeader", R_REC},
         {L"Windows.UI.Xaml.Controls.Grid", L"TopLevelSuggestionsContainer", R_REC_WRAP},
@@ -519,12 +538,21 @@ struct Watcher : winrt::implements<Watcher, IVisualTreeServiceCallback2, winrt::
     }
 
     void AddStart(VisualElement const& element, std::wstring_view type, std::wstring_view name) {
-        Role role;
-        if (!SmRole(type, name, role)) return;
+        Role role = R_BG;
+        bool known = SmRole(type, name, role);
+        bool maybeBg = !known && (type == L"Windows.UI.Xaml.Controls.Border" || type == L"Windows.UI.Xaml.Controls.Grid");
+        if (!known && !maybeBg) return;
         auto insp = Inspect(element.Handle);
         if (!insp) return;
         auto fe = insp.try_as<wux::FrameworkElement>();
         if (!fe) return;
+        if (maybeBg) {
+            wuxm::Brush bg{nullptr};
+            if (auto b = fe.try_as<wuxc::Border>()) bg = b.Background();
+            else if (auto pnl = fe.try_as<wuxc::Panel>()) bg = pnl.Background();
+            if (!bg || !bg.try_as<wuxm::AcrylicBrush>()) return;
+            role = R_BG_GEN;
+        }
         std::lock_guard<std::recursive_mutex> l(g_lock);
         g_sm.erase(std::remove_if(g_sm.begin(), g_sm.end(), [](SmItem const& t) { return !t.el.get(); }), g_sm.end());
         for (auto& t : g_sm)
@@ -541,9 +569,11 @@ struct Watcher : winrt::implements<Watcher, IVisualTreeServiceCallback2, winrt::
         fe.RegisterPropertyChangedCallback(wux::UIElement::OpacityProperty(), cb);
         fe.RegisterPropertyChangedCallback(wux::UIElement::VisibilityProperty(), cb);
         if (role == R_FRAME) {
-            fe.RegisterPropertyChangedCallback(wux::FrameworkElement::WidthProperty(), cb);
             fe.RegisterPropertyChangedCallback(wux::FrameworkElement::HeightProperty(), cb);
+            fe.RegisterPropertyChangedCallback(wux::UIElement::RenderTransformProperty(), cb);
         }
+        if (role == R_BG_GEN && fe.try_as<wuxc::Panel>())
+            fe.RegisterPropertyChangedCallback(wuxc::Panel::BackgroundProperty(), cb);
         if (fe.try_as<wuxc::Border>()) {
             fe.RegisterPropertyChangedCallback(wuxc::Border::BackgroundProperty(), cb);
             fe.RegisterPropertyChangedCallback(wuxc::Border::CornerRadiusProperty(), cb);

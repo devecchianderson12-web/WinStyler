@@ -41,7 +41,7 @@ DEFAULTS = {k: "keep" for k in CHOICE_KEYS}
 DEFAULTS.update({"accent_color": "#0078D4", "st_force_rec": False, "folders": [],
                  "tb_opacity": 0, "tb_tint_on": False, "tb_tint": "#14161F", "tb_tint2": "#7B6CF6",
                  "sm_opacity": 60, "sm_tint_on": False, "sm_tint": "#14161F", "sm_tint2": "#7B6CF6",
-                 "sm_corner": None, "sm_width": None, "sm_height": None,
+                 "sm_corner": None, "sm_scale": None, "sm_height": None,
                  "tb_hover_ms": None, "menu_delay": None})
 
 # (clave, ruta, [valores], {opcion: dato})
@@ -146,7 +146,7 @@ def effect_values(cfg):
 
     seff = cfg.get("sm_effect", "keep")
     extras = any(cfg.get(k, "keep") != "keep" for k in ("sm_shadow", "sm_border", "sm_search", "sm_rec")) or \
-        any(cfg.get(k) is not None for k in ("sm_corner", "sm_width", "sm_height"))
+        any(cfg.get(k) is not None for k in ("sm_corner", "sm_scale", "sm_height"))
     if seff in EFFECT_ON or (extras and seff != "default"):
         opacity, tint, tint2 = _bg_values(seff, cfg, "sm") if seff in EFFECT_ON else (100, NO_TINT, NO_TINT)
         shadow = cfg.get("sm_shadow", "keep")
@@ -157,7 +157,7 @@ def effect_values(cfg):
 
         out.update({"SmEnabled": 1, "SmOpacity": opacity, "SmTint": tint, "SmTint2": tint2,
                     "SmCorner": NO_TINT if cfg.get("sm_corner") is None else int(cfg["sm_corner"]),
-                    "SmWidth": int(cfg.get("sm_width") or 0), "SmHeight": int(cfg.get("sm_height") or 0),
+                    "SmScale": int(cfg.get("sm_scale") or 0), "SmHeight": int(cfg.get("sm_height") or 0),
                     "SmShadow": shadow, "SmBorder": flag("sm_border"), "SmSearch": flag("sm_search"),
                     "SmRec": flag("sm_rec")})
     elif seff == "default":
@@ -261,7 +261,7 @@ def build_items(cfg):
 def has_changes(cfg):
     if any(cfg.get(k, "keep") != "keep" for k in CHOICE_KEYS):
         return True
-    if any(cfg.get(k) is not None for k in ("tb_hover_ms", "menu_delay", "sm_corner", "sm_width", "sm_height")):
+    if any(cfg.get(k) is not None for k in ("tb_hover_ms", "menu_delay", "sm_corner", "sm_scale", "sm_height")):
         return True
     return bool(cfg.get("st_force_rec")) or bool(cfg.get("folders"))
 

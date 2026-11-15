@@ -7,6 +7,7 @@ import sys
 import json
 import time
 import math
+import colorsys
 import base64
 import ctypes
 import tempfile
@@ -14,7 +15,7 @@ import threading
 import subprocess
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import colorchooser, filedialog, messagebox
+from tkinter import filedialog
 
 import generador as gen
 
@@ -216,7 +217,7 @@ def effective(cfg, style):
         if cfg.get("tb_tint_on"):
             tb_base = tint
     elif eff in ("solid", "gradient"):
-        tb_base, tb_alpha = tint, 1.0
+        tb_base, tb_alpha = tint, max(0, min(100, int(cfg.get("tb_opacity", 100)))) / 100.0
     under = mix(wall(PW / 2.0, PW, 0.97), tb_base, tb_alpha)
     e["tb_base"], e["tb_alpha"], e["tb_under"] = tb_base, tb_alpha, under
     e["tb_fg"] = (255, 255, 255) if lum(under) < 140 else (20, 20, 20)
@@ -234,7 +235,7 @@ def effective(cfg, style):
         if cfg.get("sm_tint_on"):
             e["base"] = stint
     elif seff in ("solid", "gradient"):
-        e["base"], e["alpha"] = stint, 1.0
+        e["base"], e["alpha"] = stint, max(0, min(100, int(cfg.get("sm_opacity", 100)))) / 100.0
         if seff == "gradient":
             e["sm_base2"] = rgb(cfg.get("sm_tint2") or "#7B6CF6")
     if seff in ("transparent", "translucent", "solid", "gradient"):
@@ -459,10 +460,10 @@ def _start11(c, e, W, bottom):
         steps = 24
         for i in range(steps):
             t0, t1 = i / float(steps), (i + 1) / float(steps)
-            col = mix(base, e["sm_base2"], (t0 + t1) / 2)
+            col = mix(wall(W / 2, W, 0.5), mix(base, e["sm_base2"], (t0 + t1) / 2), e["alpha"])
             r = rad if i in (0, steps - 1) else 0
             rrect(c, px, py + ph * t0, px + pw, py + ph * t1 + 1, r, fill=hexs(col), outline="")
-        pcol = mix(base, e["sm_base2"], 0.5)
+        pcol = mix(wall(W / 2, W, 0.5), mix(base, e["sm_base2"], 0.5), e["alpha"])
     elif e["alpha"] > 0:
         rrect(c, px, py, px + pw, py + ph, rad, fill=hexs(pcol), outline="")
     if e["border"] or e["sm_border"]:
@@ -1028,6 +1029,200 @@ def dark_titlebar(win):
         pass
 
 
+class DarkDialog(tk.Toplevel):
+    """Base de los diálogos oscuros: centra, oscurece la barra de título y es modal."""
+
+    def __init__(self, title):
+        master = tk._default_root
+        super().__init__(master)
+        self.master_win = master
+        self.result = None
+        self.withdraw()
+        self.title(title)
+        self.configure(bg=PANEL)
+        self.resizable(False, False)
+        self.transient(master)
+        self.bind("<Escape>", lambda e: self.destroy())
+
+    def show(self):
+        dark_titlebar(self)
+        self.update_idletasks()
+        m = self.master_win
+        x = m.winfo_rootx() + (m.winfo_width() - self.winfo_reqwidth()) // 2
+        y = m.winfo_rooty() + (m.winfo_height() - self.winfo_reqheight()) // 3
+        self.geometry("+%d+%d" % (max(0, x), max(0, y)))
+        self.deiconify()
+        self.grab_set()
+        self.focus_set()
+        self.wait_window()
+        return self.result
+
+
+class MessageDialog(DarkDialog):
+    def __init__(self, title, text, kind="info", buttons=(("Aceptar", True),)):
+        super().__init__(title)
+        body = tk.Frame(self, bg=PANEL)
+        body.pack(fill="both", padx=20, pady=(18, 6))
+        led = tk.Canvas(body, width=14, height=14, bg=PANEL, highlightthickness=0)
+        led.pack(side="left", anchor="n", pady=4)
+        led.create_oval(1, 1, 13, 13, fill={"info": MINT, "error": CORAL, "ask": ACCENT}[kind], outline="")
+        tk.Label(body, text=text, bg=PANEL, fg=TEXT, font=font("md"), justify="left", wraplength=380).pack(
+            side="left", padx=(12, 0))
+        bar = tk.Frame(self, bg=PANEL)
+        bar.pack(fill="x", padx=14, pady=14)
+        for i, (label, value) in enumerate(reversed(buttons)):
+            PillButton(bar, label, lambda v=value: self._close(v), primary=bool(value), height=32,
+                       bg=PANEL).pack(side="right", padx=4)
+        self.bind("<Return>", lambda e: self._close(buttons[-1][1] if len(buttons) == 1 else buttons[0][1]))
+
+    def _close(self, value):
+        self.result = value
+        self.destroy()
+
+
+class messagebox:  # reemplazo oscuro de tkinter.messagebox (misma interfaz)
+    @staticmethod
+    def showinfo(title, text):
+        MessageDialog(title, text, "info").show()
+
+    @staticmethod
+    def showerror(title, text):
+        MessageDialog(title, text, "error").show()
+
+    @staticmethod
+    def askyesno(title, text):
+        return bool(MessageDialog(title, text, "ask", (("Sí", True), ("No", False))).show())
+
+
+def _hsv_to_hex(h, s, v):
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return "#%02x%02x%02x" % (int(r * 255 + 0.5), int(g * 255 + 0.5), int(b * 255 + 0.5))
+
+
+class ColorDialog(DarkDialog):
+    """Selector de color oscuro: cuadro de saturación/brillo, barra de tono, paleta y HEX."""
+    SW, SH, HB = 240, 160, 16
+    SWATCHES = ["#12141c", "#1a1d28", "#232737", "#3a3f55", "#7d839b", "#d6daea", "#ffffff", "#000000",
+                "#7b6cf6", "#988cff", "#4ef0c8", "#3ec7f2", "#0078d4", "#ff5f6d", "#ef6fd0", "#f7a14c",
+                "#ffd166", "#16c60c", "#1b1240", "#2b1055", "#0d2b45", "#3a0f2e", "#5c2d91", "#6c5ce7"]
+
+    def __init__(self, color, title):
+        super().__init__(title)
+        try:
+            r, g, b = rgb(color or "#7b6cf6")
+        except ValueError:
+            r, g, b = 123, 108, 246
+        self.h, self.s, self.v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        wrap = tk.Frame(self, bg=PANEL)
+        wrap.pack(padx=18, pady=(16, 4))
+        left = tk.Frame(wrap, bg=PANEL)
+        left.pack(side="left")
+        self.sv = tk.Canvas(left, width=self.SW, height=self.SH, highlightthickness=1,
+                            highlightbackground=PANEL_LO, bd=0, cursor="crosshair")
+        self.sv.pack()
+        self.hue = tk.Canvas(left, width=self.SW, height=self.HB, highlightthickness=1,
+                             highlightbackground=PANEL_LO, bd=0, cursor="hand2")
+        self.hue.pack(pady=(10, 0))
+        self._hue_img = tk.PhotoImage(master=self, width=self.SW, height=1)
+        self._hue_img.put("{" + " ".join(_hsv_to_hex(x / float(self.SW), 1, 1) for x in range(self.SW)) + "}")
+        self._hue_img = self._hue_img.zoom(1, self.HB)
+        self.hue.create_image(0, 0, image=self._hue_img, anchor="nw")
+        right = tk.Frame(wrap, bg=PANEL)
+        right.pack(side="left", fill="y", padx=(16, 0))
+        self.prev = tk.Canvas(right, width=120, height=64, bg=PANEL, highlightthickness=0)
+        self.prev.pack(anchor="w")
+        tk.Label(right, text="HEX", bg=PANEL, fg=MUTED, font=font("sm")).pack(anchor="w", pady=(10, 2))
+        self.hexvar = tk.StringVar()
+        ent = tk.Entry(right, textvariable=self.hexvar, width=10, bg=TRACK, fg=TEXT, insertbackground=TEXT,
+                       relief="flat", font=font("md"), highlightthickness=1, highlightbackground=LINE,
+                       highlightcolor=ACCENT)
+        ent.pack(anchor="w", ipady=4)
+        ent.bind("<Return>", self._from_hex)
+        ent.bind("<FocusOut>", self._from_hex)
+        pal = tk.Frame(self, bg=PANEL)
+        pal.pack(padx=18, pady=(12, 0), anchor="w")
+        for i, col in enumerate(self.SWATCHES):
+            c = tk.Canvas(pal, width=22, height=22, bg=PANEL, highlightthickness=0, cursor="hand2")
+            c.grid(row=i // 12, column=i % 12, padx=2, pady=2)
+            c.create_oval(2, 2, 20, 20, fill=col, outline=LINE)
+            c.bind("<Button-1>", lambda e, h=col: self._set_hex(h))
+        bar = tk.Frame(self, bg=PANEL)
+        bar.pack(fill="x", padx=14, pady=14)
+        PillButton(bar, "Aceptar", self._ok, primary=True, height=32, bg=PANEL).pack(side="right", padx=4)
+        PillButton(bar, "Cancelar", self.destroy, height=32, bg=PANEL).pack(side="right", padx=4)
+        for ev in ("<Button-1>", "<B1-Motion>"):
+            self.sv.bind(ev, self._sv_click)
+            self.hue.bind(ev, self._hue_click)
+        self._sv_img = None
+        self._render_sv()
+        self._update()
+
+    def _render_sv(self):
+        w, h = self.SW // 4, self.SH // 4  # se dibuja reducido y se amplía (rápido)
+        img = tk.PhotoImage(master=self, width=w, height=h)
+        rows = []
+        for y in range(h):
+            v = 1 - y / float(h - 1)
+            rows.append("{" + " ".join(_hsv_to_hex(self.h, x / float(w - 1), v) for x in range(w)) + "}")
+        img.put(" ".join(rows))
+        self._sv_img = img.zoom(4, 4)
+        self.sv.delete("img")
+        self.sv.create_image(0, 0, image=self._sv_img, anchor="nw", tags="img")
+        self.sv.tag_lower("img")
+
+    def _update(self):
+        hx = _hsv_to_hex(self.h, self.s, self.v)
+        self.color = hx
+        self.hexvar.set(hx.upper())
+        self.sv.delete("mark")
+        x, y = self.s * (self.SW - 1), (1 - self.v) * (self.SH - 1)
+        self.sv.create_oval(x - 6, y - 6, x + 6, y + 6, outline="#ffffff", width=2, tags="mark")
+        self.hue.delete("mark")
+        hxp = self.h * (self.SW - 1)
+        self.hue.create_rectangle(hxp - 3, 0, hxp + 3, self.HB + 1, outline="#ffffff", width=2, tags="mark")
+        self.prev.delete("all")
+        rrect(self.prev, 0, 0, 120, 64, 14, fill=hx, outline=LINE)
+
+    def _sv_click(self, ev):
+        self.s = min(1.0, max(0.0, ev.x / float(self.SW - 1)))
+        self.v = min(1.0, max(0.0, 1 - ev.y / float(self.SH - 1)))
+        self._update()
+
+    def _hue_click(self, ev):
+        self.h = min(0.999, max(0.0, ev.x / float(self.SW - 1)))
+        self._render_sv()
+        self._update()
+
+    def _set_hex(self, hx):
+        try:
+            r, g, b = rgb(hx)
+        except ValueError:
+            return
+        self.h, self.s, self.v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        self._render_sv()
+        self._update()
+
+    def _from_hex(self, _ev=None):
+        t = self.hexvar.get().strip().lstrip("#")
+        if len(t) == 6 and all(ch in "0123456789abcdefABCDEF" for ch in t):
+            if ("#" + t).lower() != self.color.lower():
+                self._set_hex("#" + t)
+        else:
+            self.hexvar.set(self.color.upper())
+
+    def _ok(self):
+        self._from_hex()
+        self.result = self.color
+        self.destroy()
+
+
+class colorchooser:  # reemplazo oscuro de tkinter.colorchooser (misma interfaz)
+    @staticmethod
+    def askcolor(color=None, title="Color"):
+        hx = ColorDialog(color, title).show()
+        return (rgb(hx), hx) if hx else (None, None)
+
+
 # ----------------------------------------------------------------- aplicación
 class App:
     def __init__(self, root):
@@ -1157,10 +1352,11 @@ class App:
 
     def _choice(self, panel, key):
         label, opts = CHOICES[key]
+        cmd = (lambda k=key: self._effect_changed(k)) if key in ("tb_effect", "sm_effect") else self.refresh
         if Segmented.fits(opts):
-            w = Segmented(panel.body, opts, command=self.refresh)
+            w = Segmented(panel.body, opts, command=cmd)
         else:
-            w = Dropdown(panel.body, opts, command=self.refresh)
+            w = Dropdown(panel.body, opts, command=cmd)
         self.ctrl[key] = w
         return panel.row(label, w)
 
@@ -1216,7 +1412,8 @@ class App:
         tk.Label(l2, text="Color 1 / 2 (degradado)", bg=PANEL, fg=MUTED, font=font("sm")).pack(side="left", padx=10)
         p.full(row)
         self._choice(p, "tb_stroke")
-        p.note("«Transparente» deja solo los íconos flotando sobre el fondo. La opacidad se usa en «Translúcida». "
+        p.note("«Transparente» deja solo los íconos flotando sobre el fondo. La opacidad vale para «Translúcida», "
+               "«Color sólido» y «Degradado». "
                "Esto lo hace un módulo pequeño (wstb.dll) que se guarda en %LOCALAPPDATA%\\WinStyler y se inicia con "
                "Windows para mantener el efecto; «Predeterminado de Windows» o «Restaurar original» lo quitan.")
 
@@ -1262,7 +1459,7 @@ class App:
             self._choice(p, k)
         p.full(self._btnrow(p.body, [("Modo compacto", lambda: self.preset(COMPACT))]))
         p.note("Lo aplica el mismo módulo del efecto de barra (Windows 11); se ve la próxima vez que abras el menú. "
-               "La opacidad se usa en «Translúcido». «Tamaño» comprime todo el menú (sin recortar) y «Alto» lo "
+               "La opacidad vale para «Translúcido», «Color sólido» y «Degradado». «Tamaño» comprime todo el menú (sin recortar) y «Alto» lo "
                "acorta; ninguno puede agrandarlo porque Windows no deja que su ventana crezca. El panel de búsqueda "
                "es otra aplicación de Windows (SearchHost) y no se puede teñir. Doble clic en una perilla con LED para activarla o dejarla sin cambio.")
 
@@ -1311,6 +1508,15 @@ class App:
         tk.Label(f, bg=BG, fg=MUTED, font=font("sm"), justify="left", anchor="w", wraplength=480,
                  text="[10] y [11] indican la versión de Windows donde aplica cada opción; en la otra se ignora. "
                       "«—» deja el valor actual sin tocar.").pack(fill="x", padx=6, pady=(0, 10))
+
+    def _effect_changed(self, key):
+        knob = self.kn_opacity if key == "tb_effect" else self.kn_sm_opacity
+        eff = self.ctrl[key].get()
+        if eff == "translucent":
+            knob.set(50)
+        elif eff in ("solid", "gradient"):
+            knob.set(100)
+        self.refresh()
 
     def _show_tab(self):
         code = self.tabbar.get()

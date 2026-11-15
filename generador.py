@@ -39,8 +39,8 @@ CHOICE_KEYS = [
 
 DEFAULTS = {k: "keep" for k in CHOICE_KEYS}
 DEFAULTS.update({"accent_color": "#0078D4", "st_force_rec": False, "folders": [],
-                 "tb_opacity": 0, "tb_tint_on": False, "tb_tint": "#14161F", "tb_tint2": "#7B6CF6",
-                 "sm_opacity": 60, "sm_tint_on": False, "sm_tint": "#14161F", "sm_tint2": "#7B6CF6",
+                 "tb_opacity": 100, "tb_tint_on": False, "tb_tint": "#14161F", "tb_tint2": "#7B6CF6",
+                 "sm_opacity": 100, "sm_tint_on": False, "sm_tint": "#14161F", "sm_tint2": "#7B6CF6",
                  "sm_corner": None, "sm_scale": None, "sm_height": None,
                  "tb_hover_ms": None, "menu_delay": None})
 
@@ -124,12 +124,13 @@ def _bg_values(eff, cfg, pre):
     tint = _col(cfg.get(pre + "_tint"))
     if eff == "transparent":
         return 0, NO_TINT, NO_TINT
+    # la perilla de opacidad vale para translúcido, color sólido y degradado
+    opacity = max(0, min(100, int(cfg.get(pre + "_opacity", 100))))
     if eff == "translucent":
-        opacity = max(0, min(100, int(cfg.get(pre + "_opacity", 50))))
         return opacity, (tint if cfg.get(pre + "_tint_on") else NO_TINT), NO_TINT
     if eff == "gradient":
-        return 100, tint, _col(cfg.get(pre + "_tint2"))
-    return 100, tint, NO_TINT
+        return opacity, tint, _col(cfg.get(pre + "_tint2"))
+    return opacity, tint, NO_TINT
 
 
 def effect_values(cfg):

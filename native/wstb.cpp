@@ -819,7 +819,21 @@ static void Win10Tick(const Cfg& c, bool off) {
     EnumWindows(Win10Apply, reinterpret_cast<LPARAM>(&ap));
 }
 
+// Pide a todos los programas que vuelvan a poner su ícono en la bandeja (Steam, Discord...).
+// Es el mismo aviso que manda Windows cuando arranca la barra; no cierra ni cambia nada.
+static void RefreshTrayIcons() {
+    static const UINT msg = RegisterWindowMessageW(L"TaskbarCreated");
+    if (msg) PostMessageW(HWND_BROADCAST, msg, 0, 0);
+}
+
+static DWORD g_trayNotified = 0;
+
 static LRESULT CALLBACK KeepProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+    if (m == WM_TIMER && w == 2) {
+        KillTimer(h, 2);
+        RefreshTrayIcons();
+        return 0;
+    }
     if (m == WM_TIMER) {
         Cfg c = ReadCfg();
         bool sm = ReadSmCfg().enabled != 0;
@@ -838,6 +852,12 @@ static LRESULT CALLBACK KeepProc(HWND h, UINT m, WPARAM w, LPARAM l) {
                 DWORD pid = 0;
                 if (tray) GetWindowThreadProcessId(tray, &pid);
                 Ensure(g_tbTarget, pid);
+                // Barra nueva (inicio de sesión, reinicio o cierre inesperado del Explorador):
+                // los íconos que se registraron mientras arrancaba se pierden; se recuperan.
+                if (g_tbTarget.injected && g_tbTarget.injected != g_trayNotified) {
+                    g_trayNotified = g_tbTarget.injected;
+                    SetTimer(h, 2, 4000, nullptr);
+                }
             }
             if (sm) Ensure(g_smTarget, FindProcess(L"StartMenuExperienceHost.exe"));
         }

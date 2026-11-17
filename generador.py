@@ -441,6 +441,12 @@ if (($mode -eq 'effect' -and -not $on) -or $mode -eq 'purge') {
 if ($mode -eq 'purge') {
   for ($t = 0; $t -lt 10 -and (Test-Path -LiteralPath $wsDir); $t++) { Remove-Item -LiteralPath $wsDir -Recurse -Force; if (Test-Path -LiteralPath $wsDir) { Start-Sleep -Milliseconds 300 } }
 }
+if ($mode -eq 'tray') {
+  # Tras reiniciar el Explorador, los programas en segundo plano vuelven a mostrar su ícono.
+  Start-Sleep -Seconds 4
+  Add-Type -Namespace WsTray -Name U -MemberDefinition '[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterWindowMessage(string s); [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);'
+  [void][WsTray.U]::PostMessage([IntPtr]0xffff, [WsTray.U]::RegisterWindowMessage('TaskbarCreated'), [IntPtr]::Zero, [IntPtr]::Zero)
+}
 if ((Test-Path -LiteralPath $wsDir) -and -not (Get-ChildItem -LiteralPath $wsDir -Force)) { Remove-Item -LiteralPath $wsDir -Force }
 """
 
@@ -501,9 +507,8 @@ def build_apply_bat(cfg, dll_b64=None):
           "taskkill /f /im explorer.exe >nul 2>&1"]
     if eff:
         L += ['set "WS_MODE=effect"', 'set "WS_SCOPE=HKCU"', "call :ps"]
-    L += ['start "" explorer.exe']
+    L += ['start "" explorer.exe', 'set "WS_MODE=tray"', 'set "WS_SCOPE=HKCU"', "call :ps"]
     L += ["echo Listo.",
-          "ping -n 3 127.0.0.1 >nul",
           "exit /b 0", "",
           ":hklm_only", "call :hklm", "exit /b 0", "",
           ":hklm", 'set "WS_MODE=backup"', 'set "WS_SCOPE=HKLM"']
@@ -532,8 +537,8 @@ def build_restore_bat():
          "taskkill /f /im explorer.exe >nul 2>&1",
          'set "WS_MODE=purge"', 'set "WS_SCOPE=HKCU"', "call :ps",
          'start "" explorer.exe',
+         'set "WS_MODE=tray"', 'set "WS_SCOPE=HKCU"', "call :ps",
          "echo Listo.",
-         "ping -n 3 127.0.0.1 >nul",
          "exit /b 0", "",
          ":hklm_only", "call :hklm", "exit /b 0", "",
          ":hklm", 'set "WS_MODE=restore"', 'set "WS_SCOPE=HKLM"', "call :ps", "exit /b 0", "",

@@ -13,6 +13,8 @@ set "WORK=%TEMP%\winstyler_build_%RANDOM%"
   --icon "%~dp0assets\winstyler.ico" ^
   --add-data "%~dp0assets\winstyler.ico;assets" ^
   --add-data "%~dp0assets\logo.png;assets" ^
+  --add-data "%~dp0mods;mods" ^
+  --add-data "%~dp0themes;themes" ^
   --add-binary "%~dp0native\wstb.dll;native" ^
   --distpath "%~dp0." --workpath "%WORK%" --specpath "%WORK%" ^
   "%~dp0WinStyler.py"

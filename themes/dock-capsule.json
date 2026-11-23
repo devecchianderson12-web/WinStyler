@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "kind": "theme",
+  "id": "dock-capsule",
+  "name": "Dock y cápsula",
+  "description": "Barra tipo dock con la bandeja en una cápsula aparte, menú Inicio acrílico verde oscuro sin buscador ni recomendados y con más columnas de anclados.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "settings_cfg": {
+    "tb_effect": "default",
+    "sm_effect": "default",
+    "tb_theme": "dark",
+    "tb_align": "center"
+  },
+  "preview": {
+    "bar": "#1E241E",
+    "bar_alpha": 0.0,
+    "menu": "#1E2A1E",
+    "menu_alpha": 0.85,
+    "accent": "#4EF0C8"
+  },
+  "mods": {
+    "tb-dock": {
+      "enabled": true,
+      "settings": {
+        "color": "#D91E241E",
+        "gap": 3
+      }
+    },
+    "tb-tray-pill": {
+      "enabled": true,
+      "settings": {
+        "color": "#D91E241E",
+        "radius": 10,
+        "gap": 4
+      }
+    },
+    "sm-acrylic": {
+      "enabled": true,
+      "settings": {
+        "tint": "#1E2A1E",
+        "tint_opacity": 70,
+        "luminosity": 10
+      }
+    },
+    "sm-frame": {
+      "enabled": true,
+      "settings": {
+        "radius": 10,
+        "width": 1,
+        "color": "#22FFFFFF"
+      }
+    },
+    "sm-elements": {
+      "enabled": true,
+      "settings": {
+        "search": true,
+        "user": false,
+        "power": false,
+        "all_apps": false,
+        "headers": false,
+        "recommended": true
+      }
+    },
+    "sm-pinned": {
+      "enabled": true,
+      "settings": {
+        "columns": 6,
+        "height": 420
+      }
+    }
+  }
+}

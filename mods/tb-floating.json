@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": "tb-floating",
+  "name": "Barra flotante redondeada",
+  "category": "Barra de tareas",
+  "description": "Separa el fondo de la barra de los bordes de la pantalla y redondea sus esquinas, como una cápsula flotante. Se combina con cualquier fondo (acrílico, color, transparente).",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "radius",
+      "label": "Radio de las esquinas",
+      "type": "number",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "default": 12,
+      "unit": "px"
+    },
+    {
+      "key": "side",
+      "label": "Margen lateral",
+      "type": "number",
+      "min": 0,
+      "max": 80,
+      "step": 1,
+      "default": 10,
+      "unit": "px"
+    },
+    {
+      "key": "top",
+      "label": "Margen superior",
+      "type": "number",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "default": 3,
+      "unit": "px"
+    },
+    {
+      "key": "bottom",
+      "label": "Margen inferior",
+      "type": "number",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "default": 5,
+      "unit": "px"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl",
+      "styles": [
+        "Margin={side},{top},{side},{bottom}"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "RadiusX={radius}",
+        "RadiusY={radius}"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    }
+  ]
+}

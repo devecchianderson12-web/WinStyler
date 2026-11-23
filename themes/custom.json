@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "kind": "theme",
+  "id": "custom",
+  "name": "Custom (desde cero)",
+  "description": "Punto de partida vacío: elegí colores, transparencias y mods para cada componente y guardalo como tema propio.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "settings_cfg": {},
+  "preview": {
+    "bar": "#202020",
+    "bar_alpha": 0.85,
+    "menu": "#202020",
+    "menu_alpha": 0.9,
+    "accent": "#0078D4"
+  },
+  "mods": {}
+}

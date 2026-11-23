@@ -17,6 +17,8 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog
 
+import copy
+import catalogo
 import generador as gen
 
 APP_NAME = "WinStyler"
@@ -250,7 +252,67 @@ def effective(cfg, style):
     e["suggest"] = g("st_suggestions", "on") == "on"
     e["most_used"] = g("st_most_used", "show") == "show"
     e["folders"] = cfg.get("folders") or []
+    _sim_mods(cfg, e)
     return e
+
+
+def argb(h, default="#FF000000"):
+    t = (h or default).lstrip("#")
+    if len(t) == 6:
+        t = "FF" + t
+    try:
+        return int(t[0:2], 16) / 255.0, (int(t[2:4], 16), int(t[4:6], 16), int(t[6:8], 16))
+    except ValueError:
+        return 1.0, (0, 0, 0)
+
+
+def _sim_mods(cfg, e):
+    """Simula en la vista previa los mods incluidos que cambian la barra y el menú."""
+    e.update({"tb_float": None, "tb_dock": None, "tray_pill": None, "ind": None,
+              "sm_border_col": None, "sm_hide_user": False, "sm_hide_power": False, "sim_missing": 0})
+    for mid, st in (cfg.get("mods") or {}).items():
+        if not st.get("enabled"):
+            continue
+        v = st.get("settings") or {}
+        g = lambda k, d: v.get(k, d)
+        if mid == "tb-floating":
+            e["tb_float"] = (g("side", 10) * 0.375, g("top", 3) * 0.8, g("bottom", 5) * 0.8, g("radius", 12) * 0.8)
+            e["stroke"] = False
+        elif mid == "tb-acrylic":
+            e["tb_base"] = rgb(g("tint", "#141824"))
+            e["tb_alpha"] = min(1.0, 0.35 + g("tint_opacity", 35) / 160.0)
+            e["tb_base2"] = None
+        elif mid == "tb-dock":
+            e["tb_dock"] = argb(g("color", "#CC161A26"))
+            e["tb_alpha"] = 0.0
+            e["stroke"] = False
+        elif mid == "tb-tray-pill":
+            e["tray_pill"] = (argb(g("color", "#CC161A26")), g("radius", 12) * 0.8)
+        elif mid == "tb-indicator":
+            e["ind"] = argb(g("color", "#4EF0C8"))[1]
+        elif mid == "sm-acrylic":
+            e["base"] = rgb(g("tint", "#0B1A3A"))
+            e["alpha"] = min(1.0, 0.45 + g("tint_opacity", 55) / 200.0)
+            e["sm_base2"] = None
+        elif mid == "sm-frame":
+            e["sm_corner"] = g("radius", 16)
+            a, col = argb(g("color", "#447B6CF6"))
+            e["sm_border_col"] = col if g("width", 1) > 0 and a > 0 else None
+        elif mid == "sm-pinned":
+            e["sm_cols"] = g("columns", 6)
+        elif mid == "sm-elements":
+            if g("search", False):
+                e["sm_search"] = False
+            if g("recommended", True):
+                e["hide_rec"] = True
+            e["sm_hide_user"] = g("user", False)
+            e["sm_hide_power"] = g("power", False)
+        elif mid.startswith(("tb-", "sm-")):
+            e["sim_missing"] += 1
+    if e["tb_dock"] or e["tb_float"] or e["tb_alpha"] < 1:
+        under = mix(wall(PW / 2.0, PW, 0.97), e["tb_base"], e["tb_alpha"])
+        e["tb_under"] = under
+        e["tb_fg"] = (255, 255, 255) if lum(under) < 140 else (20, 20, 20)
 
 
 # ----------------------------------------------------------------- vista previa
@@ -309,7 +371,11 @@ def paint(c, cfg, style, show_start, W=PW, H=PH):
 
     tbh = e["h"]
     y0 = H - (4 if e["autohide"] else tbh)
-    if e["tb_alpha"] > 0:
+    if e["tb_float"] and e["tb_alpha"] > 0:
+        side, top, bot, rad = e["tb_float"]
+        rrect(c, side, y0 + top, W - side, H - bot, rad, fill=hexs(e["tb_under"]),
+              outline=hexs(mix(e["tb_under"], (255, 255, 255), 0.12)))
+    elif e["tb_alpha"] > 0:
         for x in range(0, W, 6):
             b = mix(e["tb_base"], e["tb_base2"], x / float(W)) if e["tb_base2"] else e["tb_base"]
             col = mix(wall(x, W, 0.97), b, e["tb_alpha"])
@@ -361,6 +427,14 @@ def _taskbar(c, e, W, H, y0, tbh, fgh):
     gap = 2
     total = sum(w for _, w in els) + gap * (len(els) - 1)
     x = (W - total) / 2.0 if e["align"] == "center" else 8
+    if e["tray_pill"]:  # se dibuja antes que los íconos para no taparlos
+        (a, col), rad = e["tray_pill"]
+        rx = W - (14 if e["sd"] else 10)
+        rrect(c, rx - 136, y0 + 4, W - 4, y0 + tbh - 4, rad, fill=hexs(mix(wall(W - 60.0, W, 0.97), col, a)), outline="")
+    if e["tb_dock"]:
+        a, col = e["tb_dock"]
+        rrect(c, x - 6, y0 + 3, x + total + 6, y0 + tbh - 3, 8,
+              fill=hexs(mix(wall(W / 2.0, W, 0.97), col, a)), outline="")
     accent = "#4cc2ff"
     s = min(22, tbh - 14)
     for kind, w in els:
@@ -402,7 +476,7 @@ def _taskbar(c, e, W, H, y0, tbh, fgh):
             if wide:
                 c.create_text(x + 36, cy, text="App %d" % (i + 1), anchor="w", fill=fgh, font=("Segoe UI", 8))
             if i == 0:
-                c.create_line(mx - 6, y0 + tbh - 3, mx + 6, y0 + tbh - 3, fill=accent, width=2)
+                c.create_line(mx - 6, y0 + tbh - 3, mx + 6, y0 + tbh - 3, fill=hexs(e["ind"]) if e["ind"] else accent, width=2)
             if i == 2 and e["badges"]:
                 c.create_oval(mx + s / 2.0 - 7, cy - s / 2.0 - 3, mx + s / 2.0 + 3, cy - s / 2.0 + 7,
                               fill=CORAL, outline="")
@@ -466,8 +540,8 @@ def _start11(c, e, W, bottom):
         pcol = mix(wall(W / 2, W, 0.5), mix(base, e["sm_base2"], 0.5), e["alpha"])
     elif e["alpha"] > 0:
         rrect(c, px, py, px + pw, py + ph, rad, fill=hexs(pcol), outline="")
-    if e["border"] or e["sm_border"]:
-        out = hexs(e["border"]) if e["border"] else hexs(mix(pcol, fg, 0.15))
+    if e["border"] or e["sm_border"] or e["sm_border_col"]:
+        out = hexs(e["border"] or e["sm_border_col"] or mix(pcol, fg, 0.15))
         rrect(c, px, py, px + pw, py + ph, rad, fill="", outline=out, width=2 if e["border"] else 1)
     if e["sm_search"]:
         rrect(c, px + 16, py + 14, px + pw - 16, py + 42, 14, fill=hexs(mix(pcol, fg, 0.1)), outline=hexs(mix(pcol, fg, 0.2)))
@@ -477,7 +551,7 @@ def _start11(c, e, W, bottom):
     py += top
     c.create_text(px + 20, py + 62, text="Anclado", anchor="w", fill=fgh, font=("Segoe UI", 9, "bold"))
     c.create_text(px + pw - 20, py + 62, text="Todas  >", anchor="e", fill=fgh, font=("Segoe UI", 8))
-    cols = 6 if pw >= 300 else 4
+    cols = e.get("sm_cols") or (6 if pw >= 300 else 4)
     cell = (pw - 40) / float(cols)
     tiles = [("f", f) for f in e["folders"]]
     total = rows * cols
@@ -1223,8 +1297,488 @@ class colorchooser:  # reemplazo oscuro de tkinter.colorchooser (misma interfaz)
         return (rgb(hx), hx) if hx else (None, None)
 
 
+# ----------------------------------------------------------------- catálogo: widgets
+class Slider(tk.Canvas):
+    """Deslizador compacto para los ajustes numéricos de los mods."""
+
+    def __init__(self, master, lo, hi, value, step=1, unit="", command=None, width=190, bg=PANEL):
+        super().__init__(master, width=width + 56, height=26, bg=bg, highlightthickness=0, bd=0, cursor="hand2")
+        self.lo, self.hi, self.step, self.unit, self.command, self.W = lo, hi, step or 1, unit, command, width
+        self.value = value if value is not None else lo
+        self.bind("<Button-1>", self._drag)
+        self.bind("<B1-Motion>", self._drag)
+        self.bind("<ButtonRelease-1>", lambda e: self.command and self.command())
+        self.bind("<MouseWheel>", self._wheel)
+        self.draw()
+
+    def draw(self):
+        self.delete("all")
+        f = (self.value - self.lo) / float(self.hi - self.lo or 1)
+        rrect(self, 2, 10, self.W, 16, 3, fill=TRACK, outline="")
+        rrect(self, 2, 10, 2 + (self.W - 2) * f, 16, 3, fill=ACCENT, outline="")
+        x = 2 + (self.W - 2) * f
+        self.create_oval(x - 7, 6, x + 7, 20, fill="#eef0fa", outline=PANEL_LO)
+        self.create_text(self.W + 52, 13, text="%s%s" % (self.value, self.unit), anchor="e", fill=MINT, font=font("sm"))
+
+    def _set(self, v):
+        v = max(self.lo, min(self.hi, int(round(v / float(self.step)) * self.step)))
+        if v != self.value:
+            self.value = v
+            self.draw()
+
+    def _drag(self, ev):
+        self._set(self.lo + (ev.x - 2) / float(self.W - 2) * (self.hi - self.lo))
+
+    def _wheel(self, ev):
+        self._set(self.value + (self.step if ev.delta > 0 else -self.step))
+        if self.command:
+            self.command()
+        return "break"
+
+    def get(self):
+        return self.value
+
+
+class TextDialog(DarkDialog):
+    """Pegar texto (tema de Windhawk en modo textual)."""
+
+    def __init__(self, title, prompt):
+        super().__init__(title)
+        tk.Label(self, text=prompt, bg=PANEL, fg=TEXT, font=font("md"), justify="left", wraplength=560).pack(
+            anchor="w", padx=18, pady=(16, 6))
+        self.name = tk.StringVar(value="Tema importado")
+        row = tk.Frame(self, bg=PANEL)
+        row.pack(fill="x", padx=18)
+        tk.Label(row, text="Nombre", bg=PANEL, fg=MUTED, font=font("sm")).pack(side="left")
+        tk.Entry(row, textvariable=self.name, bg=TRACK, fg=TEXT, insertbackground=TEXT, relief="flat",
+                 font=font("md"), highlightthickness=1, highlightbackground=LINE, highlightcolor=ACCENT).pack(
+            side="left", fill="x", expand=True, padx=8, ipady=3)
+        self.text = tk.Text(self, width=74, height=16, bg=TRACK, fg=TEXT, insertbackground=TEXT, relief="flat",
+                            font=("Consolas", 9), highlightthickness=1, highlightbackground=LINE, highlightcolor=ACCENT)
+        self.text.pack(padx=18, pady=10, fill="both")
+        bar = tk.Frame(self, bg=PANEL)
+        bar.pack(fill="x", padx=14, pady=(0, 14))
+        PillButton(bar, "Importar", self._ok, primary=True, height=32, bg=PANEL).pack(side="right", padx=4)
+        PillButton(bar, "Cancelar", self.destroy, height=32, bg=PANEL).pack(side="right", padx=4)
+        self.unbind("<Escape>")
+
+    def _ok(self):
+        self.result = (self.name.get().strip() or "Tema importado", self.text.get("1.0", "end"))
+        self.destroy()
+
+
+def theme_thumb(c, theme, selected, W=226, H=118):
+    """Miniatura de un tema (simulación) a partir de sus colores de vista previa."""
+    c.delete("all")
+    pv = theme.get("preview") or {}
+    bar, menu, accent = rgb(pv.get("bar", "#202020")), rgb(pv.get("menu", "#202020")), pv.get("accent", ACCENT)
+    rrect(c, 0, 0, W, H, 12, fill=ACCENT if selected else LINE, outline="")
+    rrect(c, 2, 2, W - 2, H - 2, 11, fill="#101327", outline="")
+    for i in range(12):
+        x0 = 4 + i * (W - 8) / 12.0
+        col = hexs(mix((20, 26, 56), (52, 30, 96), i / 11.0))
+        c.create_rectangle(x0, 4, x0 + (W - 8) / 12.0 + 1, H - 22, fill=col, outline="")
+    under = mix((18, 18, 40), menu, pv.get("menu_alpha", 0.9))
+    rrect(c, W / 2 - 46, 22, W / 2 + 46, H - 30, 8, fill=hexs(under), outline=hexs(mix(under, (255, 255, 255), 0.2)))
+    for i in range(8):
+        x, y = W / 2 - 34 + (i % 4) * 19, 32 + (i // 4) * 19
+        c.create_rectangle(x, y, x + 12, y + 12, fill=PALETTE[i % 8], outline="")
+    bunder = mix((16, 16, 34), bar, pv.get("bar_alpha", 0.85))
+    rrect(c, 8, H - 22, W - 8, H - 6, 6, fill=hexs(bunder), outline="")
+    for i in range(5):
+        x = W / 2 - 30 + i * 13
+        c.create_rectangle(x, H - 18, x + 9, H - 10, fill=accent if i == 0 else PALETTE[(i + 2) % 8], outline="")
+
+
+# ----------------------------------------------------------------- catálogo: páginas y lógica
+class CatalogMixin:
+    def _init_catalog(self):
+        self.mods = catalogo.load_mods()
+        self.themes = catalogo.load_themes()
+        self.mods_state = {}
+        self.current_theme = None
+        self.sel_mod = None
+        self.mod_filter = "Todas"
+
+    # ---------- temas
+    def _page_th(self, f):
+        p = Panel(f, "Biblioteca de temas")
+        p.pack(fill="x", pady=(0, 12))
+        p.note("Un tema agrupa barra, menú Inicio, Explorador, colores, transparencias y mods. Elegí uno para "
+               "verlo en la simulación; «Aplicar tema» lo lleva al sistema.")
+        self.theme_grid = tk.Frame(p.body, bg=PANEL)
+        p.full(self.theme_grid)
+        self.theme_desc = p.note("")
+        p.full(self._btnrow(p.body, [("Aplicar tema", self.theme_apply), ("Editar", self.theme_edit),
+                                      ("Duplicar", self.theme_duplicate)]))
+        p.full(self._btnrow(p.body, [("Nuevo desde actual", self.theme_new), ("Guardar cambios", self.theme_save),
+                                      ("Eliminar", self.theme_delete)]))
+        p.full(self._btnrow(p.body, [("Exportar…", self.theme_export), ("Importar…", self.theme_import)]))
+        self._fill_themes()
+
+    def _fill_themes(self):
+        for w in self.theme_grid.winfo_children():
+            w.destroy()
+        for i, th in enumerate(self.themes):
+            cell = tk.Frame(self.theme_grid, bg=PANEL)
+            cell.grid(row=i // 2, column=i % 2, padx=4, pady=6, sticky="w")
+            c = tk.Canvas(cell, width=226, height=118, bg=PANEL, highlightthickness=0, cursor="hand2")
+            c.pack()
+            theme_thumb(c, th, self.current_theme is not None and th["id"] == self.current_theme["id"])
+            tag = "" if th.get("_builtin") else "  · propio"
+            tk.Label(cell, text=th.get("name", th["id"]) + tag, bg=PANEL, fg=TEXT, font=font("sm"), anchor="w").pack(fill="x")
+            for w in (c,):
+                w.bind("<Button-1>", lambda e, t=th: self.theme_select(t))
+
+    def theme_select(self, th):
+        self.current_theme = th
+        cfg = catalogo.theme_cfg(th, gen.DEFAULTS)
+        self.set_cfg(cfg)
+        names = [m.get("name", mid) for mid, st in cfg["mods"].items() if st.get("enabled")
+                 for m in self.mods if m["id"] == mid]
+        self.theme_desc.configure(text="%s\nAutor: %s · Versión %s · Mods: %s" % (
+            th.get("description", ""), th.get("author", "?"), th.get("version", "1.0"), ", ".join(names) or "ninguno"))
+        self._fill_themes()
+        self._fill_mods()
+        self.refresh()
+
+    def theme_apply(self):
+        if not self.current_theme:
+            messagebox.showinfo("Temas", "Primero elegí un tema de la biblioteca.")
+            return
+        self.generate(True)
+
+    def theme_edit(self):
+        self.tabbar.set("tb")
+        self._show_tab()
+
+    def _theme_from_current(self, name, base=None):
+        cfg = self.get_cfg()
+        mods = cfg.pop("mods", {})
+        base = base or {}
+        pv = dict(base.get("preview") or {})
+        e = effective(dict(cfg, mods=mods), "11")
+        pv.update({"bar": hexs(e["tb_base"]), "bar_alpha": round(e["tb_alpha"], 2), "menu": hexs(e["base"]),
+                   "menu_alpha": round(e["alpha"], 2), "accent": pv.get("accent", ACCENT)})
+        keep = {k: v for k, v in cfg.items() if v not in ("keep", None) and k in gen.DEFAULTS and v != gen.DEFAULTS[k]}
+        return {"schema": 1, "kind": "theme", "id": base.get("id"), "name": name,
+                "description": base.get("description", "Tema creado en WinStyler."),
+                "author": base.get("author", "Yo") if not base.get("_builtin") else "Yo",
+                "version": base.get("version", "1.0"), "settings_cfg": keep, "mods": mods, "preview": pv}
+
+    def _save_theme(self, th):
+        try:
+            catalogo.save_user("temas", th)
+        except OSError as ex:
+            messagebox.showerror("Temas", "No se pudo guardar:\n%s" % ex)
+            return
+        self.themes = catalogo.load_themes()
+        self.current_theme = next((t for t in self.themes if t["id"] == th["id"]), None)
+        self._fill_themes()
+        self.set_status("Tema «%s» guardado" % th["name"], MINT)
+
+    def theme_new(self):
+        n = ask(self.root, "Nuevo tema", "Nombre del tema:")
+        if n and n.strip():
+            th = self._theme_from_current(n.strip())
+            th["id"] = catalogo.unique_id(catalogo._safe_id(n), self.themes)
+            self._save_theme(th)
+
+    def theme_duplicate(self):
+        if not self.current_theme:
+            return
+        th = self._theme_from_current(self.current_theme.get("name", "") + " (copia)", self.current_theme)
+        th["id"] = catalogo.unique_id(self.current_theme["id"] + "-copia", self.themes)
+        th["author"] = "Yo"
+        self._save_theme(th)
+
+    def theme_save(self):
+        th = self.current_theme
+        if not th or th.get("_builtin"):
+            messagebox.showinfo("Temas", "Los temas incluidos no se modifican: usá «Duplicar» o «Nuevo desde actual».")
+            return
+        self._save_theme(self._theme_from_current(th.get("name", th["id"]), th))
+
+    def theme_delete(self):
+        th = self.current_theme
+        if not th or th.get("_builtin"):
+            messagebox.showinfo("Temas", "Solo se pueden eliminar los temas propios.")
+            return
+        if messagebox.askyesno("Eliminar tema", "¿Eliminar el tema «%s»?" % th.get("name")):
+            catalogo.delete_user(th)
+            self.themes = catalogo.load_themes()
+            self.current_theme = None
+            self._fill_themes()
+
+    def theme_export(self):
+        th = self.current_theme or self._theme_from_current("Mi tema")
+        p = filedialog.asksaveasfilename(defaultextension=".json", initialfile=(th.get("id") or "tema") + ".json",
+                                         filetypes=[("Tema de WinStyler", "*.json")])
+        if p:
+            catalogo.export(th if self.current_theme else dict(th, id="mi-tema"), p)
+            self.set_status("Tema exportado", MINT)
+
+    def theme_import(self):
+        p = filedialog.askopenfilename(filetypes=[("Temas y mods", "*.json *.yaml *.yml *.txt"), ("Todos", "*.*")])
+        if p:
+            self._import_path(p)
+
+    # ---------- mods
+    def _page_md(self, f):
+        p = Panel(f, "Catálogo de mods")
+        p.pack(fill="x", pady=(0, 12))
+        top = tk.Frame(p.body, bg=PANEL)
+        self.mod_search = tk.StringVar()
+        ent = tk.Entry(top, textvariable=self.mod_search, bg=TRACK, fg=TEXT, insertbackground=TEXT, relief="flat",
+                       font=font("md"), width=22, highlightthickness=1, highlightbackground=LINE, highlightcolor=ACCENT)
+        ent.pack(side="left", ipady=4)
+        ent.bind("<KeyRelease>", lambda e: self._fill_mods())
+        cats = ["Todas"] + sorted({m.get("category", "Otros") for m in self.mods})
+        self.mod_cat = Dropdown(top, [(c, c) for c in cats], command=self._cat_changed, width=180)
+        self.mod_cat.pack(side="left", padx=8)
+        p.full(top)
+        self.mod_list = tk.Frame(p.body, bg=PANEL)
+        p.full(self.mod_list)
+        p.full(self._btnrow(p.body, [("Instalar mod…", self.mod_install), ("Importar de Windhawk…", self.mod_paste)]))
+
+        d = Panel(f, "Detalle")
+        d.pack(fill="x", pady=(0, 12))
+        self.mod_detail = d
+        self._fill_mods()
+        self._show_mod(None)
+
+    def _cat_changed(self):
+        self.mod_filter = self.mod_cat.get()
+        self._fill_mods()
+
+    def _mod_status(self, m):
+        if not catalogo.is_compatible(m):
+            return "No compatible", CORAL
+        if self.mods_state.get(m["id"], {}).get("enabled"):
+            return "Activo", MINT
+        return "Instalado", MUTED
+
+    def _fill_mods(self):
+        if not hasattr(self, "mod_list"):
+            return
+        for w in self.mod_list.winfo_children():
+            w.destroy()
+        q = self.mod_search.get().strip().lower()
+        shown = 0
+        for m in self.mods:
+            if self.mod_filter != "Todas" and m.get("category") != self.mod_filter:
+                continue
+            hay = " ".join([m.get("name", ""), m.get("description", ""), m.get("category", "")]).lower()
+            if q and q not in hay:
+                continue
+            shown += 1
+            sel = self.sel_mod is not None and self.sel_mod["id"] == m["id"]
+            row = tk.Canvas(self.mod_list, height=44, bg=PANEL, highlightthickness=0, cursor="hand2")
+            row.pack(fill="x", pady=2)
+            status, col = self._mod_status(m)
+
+            def draw(ev=None, c=row, m=m, sel=sel, status=status, col=col):
+                c.delete("all")
+                w = max(300, c.winfo_width())
+                rrect(c, 0, 0, w, 44, 10, fill=RAISED if sel else TRACK, outline=ACCENT if sel else PANEL_LO)
+                c.create_text(14, 14, text=m.get("name", m["id"]), anchor="w", fill=TEXT, font=font("btn"))
+                c.create_text(14, 31, text="%s · v%s · %s" % (m.get("category", ""), m.get("version", "1.0"),
+                                                              catalogo.compat_text(m)), anchor="w", fill=MUTED, font=font("sm"))
+                c.create_oval(w - 98, 18, w - 90, 26, fill=col, outline="")
+                c.create_text(w - 84, 22, text=status, anchor="w", fill=col, font=font("sm"))
+
+            row.bind("<Configure>", draw)
+            row.bind("<Button-1>", lambda e, m=m: self._show_mod(m))
+        if not shown:
+            tk.Label(self.mod_list, text="Sin resultados.", bg=PANEL, fg=MUTED, font=font("sm")).pack(anchor="w")
+
+    def _show_mod(self, m):
+        self.sel_mod = m
+        d = self.mod_detail
+        for w in d.body.winfo_children():
+            w.destroy()
+        d.nrow = 0
+        if not m:
+            d.note("Elegí un mod de la lista para ver su descripción, compatibilidad y configuración.")
+            return
+        self._fill_mods()
+        tk.Label(d.body, text=m.get("name", m["id"]), bg=PANEL, fg=TEXT, font=font("title"), anchor="w").grid(
+            row=d.nrow, column=0, columnspan=2, sticky="w")
+        d.nrow += 1
+        d.note(m.get("description", ""))
+        status, col = self._mod_status(m)
+        for k, v in (("Autor", m.get("author", "?")), ("Versión", m.get("version", "1.0")),
+                     ("Categoría", m.get("category", "")), ("Compatibilidad", catalogo.compat_text(m)),
+                     ("Requisitos", catalogo.requirements_text(m)),
+                     ("Al aplicar", catalogo.RESTART_TEXT.get(m.get("restart", "explorer"), "")),
+                     ("Estado", status)):
+            tk.Label(d.body, text=k, bg=PANEL, fg=MUTED, font=font("sm"), anchor="w").grid(row=d.nrow, column=0, sticky="nw", pady=1)
+            tk.Label(d.body, text=v, bg=PANEL, fg=col if k == "Estado" else TEXT, font=font("sm"), anchor="w",
+                     justify="left", wraplength=300).grid(row=d.nrow, column=1, sticky="w", pady=1)
+            d.nrow += 1
+        st = self.mods_state.setdefault(m["id"], {"enabled": False, "settings": {}})
+        vals = catalogo.default_settings(m)
+        vals.update(st.get("settings") or {})
+        self.mod_widgets = {}
+        for s in m.get("settings", []):
+            k, typ = s["key"], s.get("type", "text")
+            if typ == "number":
+                w = Slider(d.body, s.get("min", 0), s.get("max", 100), vals.get(k), s.get("step", 1), s.get("unit", ""),
+                           command=self._mod_settings_changed, width=150)
+            elif typ == "color":
+                w = ColorChip(d.body, vals.get(k) or "#000000", None)
+                w.command = lambda w=w, k=k: self._mod_pick_color(w, k)
+            elif typ == "bool":
+                w = Toggle(d.body, bool(vals.get(k)), command=self._mod_settings_changed)
+            elif typ == "choice":
+                w = Dropdown(d.body, [tuple(o) for o in s.get("options", [])], command=self._mod_settings_changed, width=170)
+                w.set(vals.get(k))
+            else:
+                continue
+            self.mod_widgets[k] = w
+            d.row(s.get("label", k), w)
+        on = st.get("enabled")
+        buttons = [("Desactivar" if on else "Activar", self.mod_toggle), ("Exportar…", self.mod_export)]
+        if not m.get("_builtin"):
+            buttons.append(("Eliminar", self.mod_delete))
+        d.full(self._btnrow(d.body, buttons))
+        d.note("«Activar» suma el mod a la configuración actual (y al tema que guardes); se aplica con "
+               "«Generar y aplicar». La vista previa solo simula los mods de la barra y el menú incluidos.")
+
+    def _mod_pick_color(self, chip, key):
+        res = colorchooser.askcolor(color=chip.color, title="Color")
+        if res and res[1]:
+            chip.set(res[1])
+            self._mod_settings_changed()
+
+    def _mod_settings_changed(self):
+        m = self.sel_mod
+        if not m:
+            return
+        st = self.mods_state.setdefault(m["id"], {"enabled": False, "settings": {}})
+        for k, w in self.mod_widgets.items():
+            st["settings"][k] = w.color if isinstance(w, ColorChip) else w.get()
+        self.refresh()
+
+    def mod_toggle(self):
+        m = self.sel_mod
+        if not m:
+            return
+        if not catalogo.is_compatible(m):
+            messagebox.showinfo("Mods", "Este mod no es compatible con esta versión de Windows (%s)." % catalogo.compat_text(m))
+            return
+        st = self.mods_state.setdefault(m["id"], {"enabled": False, "settings": {}})
+        st["enabled"] = not st.get("enabled")
+        self._mod_settings_changed()
+        self._show_mod(m)
+
+    def mod_export(self):
+        m = self.sel_mod
+        if not m:
+            return
+        p = filedialog.asksaveasfilename(defaultextension=".json", initialfile=m["id"] + ".json",
+                                         filetypes=[("Mod de WinStyler", "*.json")])
+        if p:
+            catalogo.export(m, p)
+            self.set_status("Mod exportado", MINT)
+
+    def mod_delete(self):
+        m = self.sel_mod
+        if m and not m.get("_builtin") and messagebox.askyesno("Eliminar mod", "¿Eliminar el mod «%s»?" % m.get("name")):
+            catalogo.delete_user(m)
+            self.mods_state.pop(m["id"], None)
+            self.mods = catalogo.load_mods()
+            self._show_mod(None)
+            self._fill_mods()
+
+    def mod_install(self):
+        p = filedialog.askopenfilename(filetypes=[("Mods y temas", "*.json *.yaml *.yml *.txt"), ("Todos", "*.*")])
+        if p:
+            self._import_path(p)
+
+    def mod_paste(self):
+        res = TextDialog("Importar de Windhawk",
+                         "Pegá el contenido del «modo textual» de un tema del Windows 11 Taskbar Styler o "
+                         "Start Menu Styler (styleConstants / controlStyles).").show()
+        if not res:
+            return
+        name, text = res
+        try:
+            mod = catalogo.windhawk_to_mod(text, name)
+        except ValueError as ex:
+            messagebox.showerror("Importar", "No se pudo leer el texto:\n%s" % ex)
+            return
+        self._install_mod(mod)
+
+    def _install_mod(self, mod):
+        if not mod.get("rules") and not mod.get("registry"):
+            messagebox.showerror("Importar", "No se encontró ningún estilo compatible.")
+            return
+        mod["id"] = catalogo.unique_id(mod["id"], [m for m in self.mods if m.get("_builtin")])
+        catalogo.save_user("mods", mod)
+        self.mods = catalogo.load_mods()
+        self.mods_state[mod["id"]] = {"enabled": True, "settings": {}}
+        self.tabbar.set("md")
+        self._show_tab()
+        self._show_mod(next((m for m in self.mods if m["id"] == mod["id"]), None))
+        self.set_status("Mod «%s» instalado y activado" % mod.get("name"), MINT)
+        self.refresh()
+
+    def _import_path(self, path):
+        try:
+            kind, obj = catalogo.import_file(path)
+        except (OSError, ValueError) as ex:
+            messagebox.showerror("Importar", "No se pudo importar:\n%s" % ex)
+            return
+        if kind == "mod":
+            self._install_mod(obj)
+        else:
+            obj["id"] = catalogo.unique_id(obj["id"], [t for t in self.themes if t.get("_builtin")])
+            self._save_theme(obj)
+            self.tabbar.set("th")
+            self._show_tab()
+
+    # ---------- estado aplicado
+    def _applied_path(self):
+        return os.path.join(catalogo.user_dir(), "estado.json")
+
+    def _load_applied(self):
+        try:
+            with open(self._applied_path(), "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+
+    def _save_applied(self, cfg):
+        name = self.current_theme.get("name") if self.current_theme else "Configuración personalizada"
+        data = {"theme": name, "time": time.strftime("%d/%m/%Y %H:%M"),
+                "mods": [mid for mid, st in (cfg.get("mods") or {}).items() if st.get("enabled")]}
+        try:
+            os.makedirs(catalogo.user_dir(), exist_ok=True)
+            with open(self._applied_path(), "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+        self._show_applied()
+
+    def _clear_applied(self):
+        try:
+            os.remove(self._applied_path())
+        except OSError:
+            pass
+        self._show_applied()
+
+    def _show_applied(self):
+        a = self._load_applied()
+        if a:
+            txt = "Aplicado en el sistema: %s · %s · %d mods" % (a.get("theme", "?"), a.get("time", ""), len(a.get("mods", [])))
+        else:
+            txt = "Aplicado en el sistema: valores de Windows (sin cambios de WinStyler registrados)"
+        self.applied_label.configure(text=txt)
+
+
 # ----------------------------------------------------------------- aplicación
-class App:
+class App(CatalogMixin):
     def __init__(self, root):
         self.root = root
         root.title("WinStyler · Barra de tareas, Inicio y Explorador")
@@ -1246,6 +1800,7 @@ class App:
         self.show_start = False
         self.busy = False
         self.areas = []
+        self._init_catalog()
         self._build()
         dark_titlebar(root)
         root.bind_all("<MouseWheel>", self._wheel)
@@ -1273,10 +1828,11 @@ class App:
         tt = tk.Frame(head, bg=BG)
         tt.pack(side="left", padx=12)
         tk.Label(tt, text="WinStyler", bg=BG, fg=TEXT, font=font("brand")).pack(anchor="w")
-        tk.Label(tt, text="Control de barra de tareas, menú Inicio y Explorador", bg=BG, fg=MUTED,
+        tk.Label(tt, text="Temas, mods y personalización de barra, menú Inicio y Explorador", bg=BG, fg=MUTED,
                  font=font("sm")).pack(anchor="w")
 
-        tabs = [("tb", "Barra"), ("fx", "Efectos"), ("st", "Inicio"), ("ex", "Explorador"), ("fd", "Carpetas")]
+        tabs = [("th", "Temas"), ("md", "Mods"), ("tb", "Barra"), ("fx", "Efectos"), ("st", "Inicio"),
+                ("ex", "Explorador"), ("fd", "Carpetas")]
         self.tabbar = Segmented(left, tabs, command=self._show_tab, bg=BG)
         self.tabbar.pack(anchor="w", pady=(0, 10))
         self.stack = tk.Frame(left, bg=BG)
@@ -1291,6 +1847,8 @@ class App:
         self._page_st(self.pages["st"].inner)
         self._page_ex(self.pages["ex"].inner)
         self._page_fd(self.pages["fd"].inner)
+        self._page_th(self.pages["th"].inner)
+        self._page_md(self.pages["md"].inner)
         self._show_tab()
 
         pre = tk.Frame(left, bg=BG)
@@ -1337,7 +1895,7 @@ class App:
         bz.create_window(16, 38, window=self.canvas, anchor="nw")
 
         info = tk.Label(right, bg=BG, fg=MUTED, font=font("sm"), justify="left", wraplength=PW + 20, anchor="w",
-                        text="Vista previa aproximada. «Generar y aplicar» crea un .bat temporal, lo ejecuta y lo borra "
+                        text="SIMULACIÓN: lo que ves arriba no está aplicado. «Generar y aplicar» crea un .bat temporal, lo ejecuta y lo borra "
                              "al terminar: no queda nada en el escritorio ni junto al programa. Antes de cambiar algo se "
                              "guarda una copia de los valores originales; «Restaurar original» los devuelve y elimina "
                              "también esa copia y el módulo del efecto de barra.")
@@ -1349,6 +1907,9 @@ class App:
         self.status = tk.Label(st, text="", bg=BG, fg=TEXT, font=font("sm"))
         self.status.pack(side="left")
         self.set_status("Listo", MINT)
+        self.applied_label = tk.Label(right, text="", bg=BG, fg=MINT, font=font("sm"), anchor="w")
+        self.applied_label.pack(anchor="w", pady=(8, 0))
+        self._show_applied()
 
     def _choice(self, panel, key):
         label, opts = CHOICES[key]
@@ -1572,6 +2133,7 @@ class App:
         cfg["sm_height"] = self.kn_sm_height.get()
         cfg["tb_hover_ms"] = self.kn_hover.get()
         cfg["menu_delay"] = self.kn_menu.get()
+        cfg["mods"] = copy.deepcopy(self.mods_state)
         return cfg
 
     def set_cfg(self, cfg):
@@ -1599,11 +2161,18 @@ class App:
         self.tg_force.set(bool(cfg.get("st_force_rec", False)))
         self.folders = list(cfg.get("folders") or [])
         self._fill_folders()
+        self.mods_state = copy.deepcopy(cfg.get("mods") or {})
+        if hasattr(self, "mod_detail"):
+            self._fill_mods()
+            self._show_mod(self.sel_mod)
 
     def refresh(self):
-        self.bezel.itemconfigure(self.bz_title, text="Vista previa · Windows %s" % self.style)
+        cfg = self.get_cfg()
+        missing = _count_unsimulated(cfg)
+        self.bezel.itemconfigure(self.bz_title, text="SIMULACIÓN (no aplicado) · Windows %s%s" % (
+            self.style, " · %d mods sin vista previa" % missing if missing else ""))
         try:
-            paint(self.canvas, self.get_cfg(), self.style, self.show_start)
+            paint(self.canvas, cfg, self.style, self.show_start)
         except Exception as ex:  # la vista previa nunca debe romper la app
             print("preview:", ex)
 
@@ -1796,7 +2365,8 @@ class App:
             messagebox.showerror("WinStyler", "No se pudo preparar el estilo:\n%s" % ex)
             return
         if run:
-            self._run_temp(text, "Aplicando estilo…", "Estilo aplicado · archivos temporales eliminados")
+            self._run_temp(text, "Aplicando estilo…", "Estilo aplicado · archivos temporales eliminados",
+                           on_ok=lambda: self._save_applied(cfg))
             return
         d = filedialog.askdirectory(title="Carpeta donde guardar aplicar_estilo.bat y restaurar_original.bat")
         if not d:
@@ -1817,14 +2387,15 @@ class App:
                                    "Se devolverán los valores que había antes de usar WinStyler, se quitará el "
                                    "efecto de barra y del menú Inicio y se borrará todo lo que WinStyler guardó.\n\n¿Continuar?"):
             return
-        self._run_temp(gen.build_restore_bat(), "Restaurando…", "Valores originales restaurados · sin rastros")
+        self._run_temp(gen.build_restore_bat(), "Restaurando…", "Valores originales restaurados · sin rastros",
+                       on_ok=self._clear_applied)
 
     def _set_busy(self, on):
         self.busy = on
         for b in (self.btn_apply, self.btn_restore, self.btn_bat):
             b.set_enabled(not on)
 
-    def _run_temp(self, text, busy_msg, done_msg):
+    def _run_temp(self, text, busy_msg, done_msg, on_ok=None):
         try:
             fd, path = tempfile.mkstemp(prefix="ws_", suffix=".bat")
             with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
@@ -1853,12 +2424,14 @@ class App:
                 except OSError:
                     time.sleep(0.3)
             left = os.path.exists(path)
-            self.root.after(0, lambda: self._done(err, left, done_msg))
+            self.root.after(0, lambda: self._done(err, left, done_msg, on_ok))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _done(self, err, left, done_msg):
+    def _done(self, err, left, done_msg, on_ok=None):
         self._set_busy(False)
+        if not err and on_ok:
+            on_ok()
         if err:
             self.set_status("Error al ejecutar", CORAL)
             messagebox.showerror("WinStyler", "No se pudo ejecutar:\n%s" % err)
@@ -1866,6 +2439,12 @@ class App:
             self.set_status("Aplicado, pero no se pudo borrar el archivo temporal", CORAL)
         else:
             self.set_status(done_msg, MINT)
+
+
+def _count_unsimulated(cfg):
+    simulated = {"tb-floating", "tb-acrylic", "tb-dock", "tb-tray-pill", "tb-indicator", "sm-acrylic", "sm-frame",
+                 "sm-elements", "sm-pinned"}
+    return sum(1 for mid, st in (cfg.get("mods") or {}).items() if st.get("enabled") and mid not in simulated)
 
 
 def main():

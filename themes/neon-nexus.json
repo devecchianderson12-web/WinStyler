@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "kind": "theme",
+  "id": "neon-nexus",
+  "name": "Neón Nexus",
+  "description": "El estilo de WinStyler: degradado violeta en barra y menú, indicadores menta y bordes luminosos.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "settings_cfg": {
+    "tb_effect": "gradient",
+    "tb_tint": "#14161F",
+    "tb_tint2": "#2B1F5C",
+    "tb_opacity": 90,
+    "sm_effect": "gradient",
+    "sm_tint": "#14161F",
+    "sm_tint2": "#3A2C80",
+    "sm_opacity": 92,
+    "tb_theme": "dark"
+  },
+  "preview": {
+    "bar": "#2B1F5C",
+    "bar_alpha": 0.9,
+    "menu": "#3A2C80",
+    "menu_alpha": 0.92,
+    "accent": "#4EF0C8"
+  },
+  "mods": {
+    "tb-indicator": {
+      "enabled": true,
+      "settings": {
+        "color": "#4EF0C8",
+        "width": 10,
+        "height": 3
+      }
+    },
+    "tb-buttons": {
+      "enabled": true,
+      "settings": {
+        "radius": 10,
+        "gap": 2,
+        "hover": "#337B6CF6",
+        "active": "#227B6CF6"
+      }
+    },
+    "sm-frame": {
+      "enabled": true,
+      "settings": {
+        "radius": 20,
+        "width": 1,
+        "color": "#887B6CF6"
+      }
+    },
+    "tb-clock": {
+      "enabled": true,
+      "settings": {
+        "color": "#FF4EF0C8",
+        "size": 12,
+        "weight": "SemiBold",
+        "hide_date": false
+      }
+    }
+  }
+}

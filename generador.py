@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """WinStyler - generador de .bat (registro de Windows 10/11)."""
 import re
+import base64
+
+import catalogo
 
 ADV = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
 EXPL = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer"
@@ -38,7 +41,7 @@ CHOICE_KEYS = [
 ]
 
 DEFAULTS = {k: "keep" for k in CHOICE_KEYS}
-DEFAULTS.update({"accent_color": "#0078D4", "st_force_rec": False, "folders": [],
+DEFAULTS.update({"accent_color": "#0078D4", "st_force_rec": False, "folders": [], "mods": {},
                  "tb_opacity": 100, "tb_tint_on": False, "tb_tint": "#14161F", "tb_tint2": "#7B6CF6",
                  "sm_opacity": 100, "sm_tint_on": False, "sm_tint": "#14161F", "sm_tint2": "#7B6CF6",
                  "sm_corner": None, "sm_scale": None, "sm_height": None,
@@ -163,7 +166,17 @@ def effect_values(cfg):
                     "SmRec": flag("sm_rec")})
     elif seff == "default":
         out["SmEnabled"] = 0
+
+    # estilos de los mods del catálogo (styles.wss)
+    if cfg.get("mods"):
+        text, used = catalogo.compile_styles(cfg)
+        out["Styles"] = 1 if text else 0
+        out["StartStyles"] = 1 if "start" in used else 0
     return out
+
+
+def styles_text(cfg):
+    return catalogo.compile_styles(cfg)[0] if cfg.get("mods") else ""
 
 
 def build_items(cfg):
@@ -256,6 +269,9 @@ def build_items(cfg):
     if cfg.get("st_force_rec"):
         add(HK_START, "HideRecommendedSection", 1)
         add(HK_EDU, "IsEducationEnvironment", 1)
+
+    # valores de registro de los mods activos del catálogo
+    items.extend(catalogo.registry_items(cfg))
     return items
 
 
@@ -264,7 +280,9 @@ def has_changes(cfg):
         return True
     if any(cfg.get(k) is not None for k in ("tb_hover_ms", "menu_delay", "sm_corner", "sm_scale", "sm_height")):
         return True
-    return bool(cfg.get("st_force_rec")) or bool(cfg.get("folders"))
+    if any(st.get("enabled") for st in (cfg.get("mods") or {}).values()):
+        return True
+    return bool(cfg.get("st_force_rec")) or bool(cfg.get("folders")) or bool(cfg.get("mods"))
 
 
 def _scope(path):
@@ -418,7 +436,18 @@ if ($mode -eq 'effect' -or $mode -eq 'purge') {
 $on = $false
 if ($mode -eq 'effect') {
   $cfg = Get-ItemProperty -LiteralPath 'HKCU:\Software\WinStyler'
-  $on = ($cfg.TbEnabled -eq 1) -or ($cfg.SmEnabled -eq 1)
+  $on = ($cfg.TbEnabled -eq 1) -or ($cfg.SmEnabled -eq 1) -or ($cfg.Styles -eq 1)
+  # estilos de los mods (styles.wss), junto a la DLL
+  $wss = Join-Path $wsDir 'styles.wss'
+  $s = [IO.File]::ReadAllText($env:WS_SELF, [Text.Encoding]::UTF8)
+  $mk = '#WSSB' + '64#'
+  $i = $s.IndexOf($mk)
+  if ($i -ge 0) {
+    $j = $s.IndexOf("`n", $i)
+    [IO.File]::WriteAllBytes($wss, [Convert]::FromBase64String($s.Substring($i + $mk.Length, $j - $i - $mk.Length).Trim()))
+  } elseif ($cfg.Styles -ne 1) {
+    Remove-Item -LiteralPath $wss -Force -ErrorAction SilentlyContinue
+  }
 }
 if ($mode -eq 'effect' -and $on) {
   $s = [IO.File]::ReadAllText($env:WS_SELF, [Text.Encoding]::UTF8)
@@ -475,7 +504,7 @@ def _join(lines):
 
 def needs_dll(cfg):
     v = effect_values(cfg)
-    return v.get("TbEnabled") == 1 or v.get("SmEnabled") == 1
+    return v.get("TbEnabled") == 1 or v.get("SmEnabled") == 1 or v.get("Styles") == 1
 
 
 def build_apply_bat(cfg, dll_b64=None):
@@ -521,6 +550,9 @@ def build_apply_bat(cfg, dll_b64=None):
           ":ps", PS_LINE, "exit /b 0", ""]
     if blob:
         L += ["rem #WSTB64#" + dll_b64, ""]
+    wss = styles_text(cfg)
+    if wss:
+        L += ["rem #WSSB64#" + base64.b64encode(wss.encode("utf-8")).decode("ascii"), ""]
     ps = PS_COMMON.replace("@@ITEMS@@", _ps_items(items, ah)).replace("@@EXTRAS@@", extras)
     return _join(L) + ps.replace("\r\n", "\n").replace("\n", "\r\n")
 

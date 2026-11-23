@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "id": "sm-font",
+  "name": "Tipografía del menú",
+  "category": "Menú Inicio",
+  "description": "Fuente y color de los textos del menú Inicio.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "font",
+      "label": "Fuente",
+      "type": "choice",
+      "options": [
+        [
+          "Segoe UI Variable",
+          "Segoe UI Variable"
+        ],
+        [
+          "Segoe UI",
+          "Segoe UI"
+        ],
+        [
+          "Bahnschrift",
+          "Bahnschrift"
+        ],
+        [
+          "Cascadia Code",
+          "Cascadia Code"
+        ],
+        [
+          "Consolas",
+          "Consolas"
+        ],
+        [
+          "Segoe Print",
+          "Segoe Print"
+        ]
+      ],
+      "default": "Bahnschrift"
+    },
+    {
+      "key": "recolor",
+      "label": "Cambiar el color",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "color",
+      "label": "Color del texto",
+      "type": "color",
+      "default": "#FFE6E9F5"
+    }
+  ],
+  "rules": [
+    {
+      "process": "start",
+      "target": "TextBlock",
+      "styles": [
+        "FontFamily={font}"
+      ]
+    },
+    {
+      "process": "start",
+      "target": "TextBlock",
+      "styles": [
+        "Foreground={color}"
+      ],
+      "when": "recolor"
+    }
+  ]
+}

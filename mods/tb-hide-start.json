@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "tb-hide-start",
+  "name": "Ocultar botón Inicio",
+  "category": "Barra de tareas",
+  "description": "Quita el botón Inicio de la barra (la tecla Windows sigue abriendo el menú).",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton]",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    }
+  ]
+}

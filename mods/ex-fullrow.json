@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "ex-fullrow",
+  "name": "Selección de fila completa en Detalles",
+  "category": "Explorador de archivos",
+  "description": "En la vista Detalles, al seleccionar se resalta la fila entera.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {},
+  "restart": "explorer",
+  "settings": [],
+  "rules": [],
+  "registry": [
+    {
+      "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+      "name": "FullRowSelect",
+      "type": "REG_DWORD",
+      "data": "1"
+    }
+  ]
+}

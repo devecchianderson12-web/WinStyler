@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "id": "sm-elements",
+  "name": "Elementos del menú",
+  "category": "Menú Inicio",
+  "description": "Oculta buscador, perfil, botón de apagado, «Todos», encabezados o recomendados.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "search",
+      "label": "Buscador",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "user",
+      "label": "Perfil de usuario",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "power",
+      "label": "Botón de apagado",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "all_apps",
+      "label": "Botón «Todos»",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "headers",
+      "label": "Encabezado «Anclado»",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "recommended",
+      "label": "Recomendados",
+      "type": "bool",
+      "default": true
+    }
+  ],
+  "rules": [
+    {
+      "process": "start",
+      "target": "StartDocked.SearchBoxToggleButton#StartMenuSearchBox",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "search"
+    },
+    {
+      "process": "start",
+      "target": "StartDocked.UserTileView#UserTile",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "user"
+    },
+    {
+      "process": "start",
+      "target": "StartDocked.PowerOptionsView#PowerButton",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "power"
+    },
+    {
+      "process": "start",
+      "target": "Button#ShowAllAppsButton",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "all_apps"
+    },
+    {
+      "process": "start",
+      "target": "TextBlock#PinnedListHeaderText",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "headers"
+    },
+    {
+      "process": "start",
+      "target": "Grid#TopLevelSuggestionsListHeader, Grid#TopLevelSuggestionsContainer, Grid#ShowMoreSuggestions",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "recommended"
+    }
+  ]
+}

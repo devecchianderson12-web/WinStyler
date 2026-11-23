@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "id": "tb-indicator",
+  "name": "Indicador de apps abiertas",
+  "category": "Barra de tareas",
+  "description": "Color, ancho y alto de la línea que marca las aplicaciones abiertas.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "color",
+      "label": "Color",
+      "type": "color",
+      "default": "#4EF0C8"
+    },
+    {
+      "key": "width",
+      "label": "Ancho",
+      "type": "number",
+      "min": 2,
+      "max": 24,
+      "step": 1,
+      "default": 6,
+      "unit": "px"
+    },
+    {
+      "key": "height",
+      "label": "Alto",
+      "type": "number",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "default": 3,
+      "unit": "px"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskListLabeledButtonPanel#IconPanel > Rectangle#RunningIndicator",
+      "styles": [
+        "Fill={color}",
+        "Width={width}",
+        "Height={height}",
+        "RadiusX=2",
+        "RadiusY=2"
+      ]
+    }
+  ]
+}

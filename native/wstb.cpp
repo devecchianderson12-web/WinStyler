@@ -30,6 +30,7 @@
 #include <mutex>
 #include <string_view>
 #include <vector>
+#include "styler.h"
 
 #pragma comment(lib, "windowsapp.lib")
 #pragma comment(lib, "user32.lib")
@@ -168,6 +169,7 @@ static void ApplyOne(Tracked& t, const Cfg& c) {
 // Windows puede reponer el valor original: se vuelve a imponer el nuestro.
 static void Reassert(wux::DependencyObject const& sender) {
     std::lock_guard<std::recursive_mutex> l(g_lock);
+    if (!g_cfg.enabled) return;  // desactivado: no compite con los estilos de los mods
     for (auto& t : g_items) {
         auto r = t.rect.get();
         if (r && r == sender) {
@@ -385,6 +387,7 @@ static void ApplySm(SmItem& it, const SmCfg& c) {
 
 static void ReassertSm(wux::DependencyObject const& sender) {
     std::lock_guard<std::recursive_mutex> l(g_lock);
+    if (!g_smCfg.enabled) return;
     for (auto& it : g_sm) {
         auto e = it.el.get();
         if (e && e == sender) {
@@ -464,6 +467,7 @@ static void ApplyThreadItems(void* pp) {
     for (int pass = 0; pass < 2; ++pass)
         for (auto& it : g_sm)
             if (it.tid == tid && ((it.role == R_REC_WRAP) == (pass == 1))) { try { ApplySm(it, g_smCfg); } catch (...) {} }
+    try { Styler_ReloadThread(); } catch (...) {}  // estilos genéricos (styles.wss)
 }
 
 static void ApplyAll() {
@@ -477,6 +481,8 @@ static void ApplyAll() {
         for (auto& t : g_sm)
             if (std::find(tids.begin(), tids.end(), t.tid) == tids.end()) tids.push_back(t.tid);
     }
+    Styler_Invalidate();
+    Styler_Threads(tids);
     for (DWORD tid : tids) {
         ApplyParam p{tid};
         RunOnThread(tid, ApplyThreadItems, &p);
@@ -619,6 +625,8 @@ struct Watcher : winrt::implements<Watcher, IVisualTreeServiceCallback2, winrt::
             if (element.Name) name = std::wstring_view(element.Name, SysStringLen(element.Name));
             if (g_inStart) AddStart(element, type, name);
             else AddTaskbar(element, type, name);
+            if (auto insp = Inspect(element.Handle))
+                if (auto fe = insp.try_as<wux::FrameworkElement>()) Styler_OnAdd(fe);
         } catch (...) {}
         return S_OK;
     }
@@ -654,6 +662,7 @@ struct Tap : winrt::implements<Tap, IObjectWithSite, winrt::non_agile> {
                 g_cfg = ReadCfg();
                 g_smCfg = ReadSmCfg();
             }
+            Styler_Init(g_module, g_inStart);
             g_watcher = winrt::make_self<Watcher>(site);
             g_watcher->Start();
             if (!g_inStart) StartExplorerService();
@@ -721,7 +730,7 @@ static HRESULT Inject(DWORD pid, const wchar_t* endpoint) {
 
 // El menú Inicio corre en un AppContainer: necesita permiso de lectura sobre la DLL,
 // su carpeta y la clave de configuración.
-static void GrantAppPackages(const wchar_t* obj, SE_OBJECT_TYPE type, DWORD access) {
+static void GrantAppPackages(const wchar_t* obj, SE_OBJECT_TYPE type, DWORD access, DWORD inherit = NO_INHERITANCE) {
     PSID sid = nullptr;
     if (!ConvertStringSidToSidW(L"S-1-15-2-1", &sid)) return;
     PACL oldAcl = nullptr, newAcl = nullptr;
@@ -730,7 +739,7 @@ static void GrantAppPackages(const wchar_t* obj, SE_OBJECT_TYPE type, DWORD acce
         EXPLICIT_ACCESSW ea{};
         ea.grfAccessPermissions = access;
         ea.grfAccessMode = GRANT_ACCESS;
-        ea.grfInheritance = NO_INHERITANCE;
+        ea.grfInheritance = inherit;
         ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
         ea.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
         ea.Trustee.ptstrName = static_cast<LPWSTR>(sid);
@@ -750,7 +759,9 @@ static void GrantAll() {
     wchar_t dir[MAX_PATH];
     wcscpy_s(dir, path);
     if (wchar_t* s = wcsrchr(dir, L'\\')) *s = 0;
-    GrantAppPackages(dir, SE_FILE_OBJECT, GENERIC_READ | GENERIC_EXECUTE);
+    GrantAppPackages(dir, SE_FILE_OBJECT, GENERIC_READ | GENERIC_EXECUTE, OBJECT_INHERIT_ACE);
+    wcscat_s(dir, L"\\styles.wss");
+    GrantAppPackages(dir, SE_FILE_OBJECT, GENERIC_READ);
     GrantAppPackages(L"CURRENT_USER\\Software\\WinStyler", SE_REGISTRY_KEY, KEY_READ);
 }
 
@@ -784,7 +795,7 @@ static DWORD WINAPI ExplorerService(LPVOID) {
     RefreshTrayIcons();  // los íconos registrados mientras arrancaba la barra se recuperan
     DWORD injected = 0;
     for (;;) {
-        if (ReadSmCfg().enabled) {
+        if (ReadSmCfg().enabled || RegDw(L"StartStyles", 0)) {
             DWORD pid = FindProcess(L"StartMenuExperienceHost.exe");
             // Si el menú está suspendido la llamada espera a que se abra; es solo este hilo.
             // La API solo acepta los nombres de conexión estándar: se prueba el primero libre.
@@ -862,7 +873,7 @@ extern "C" void CALLBACK Apply(HWND, HINSTANCE, LPSTR, int) {
     // Espera a la barra (al iniciar sesión el Explorador tarda unos segundos).
     for (int i = 0; i < 90; ++i) {
         Cfg c = ReadCfg();
-        if (!c.enabled && !ReadSmCfg().enabled) break;
+        if (!c.enabled && !ReadSmCfg().enabled && !RegDw(L"Styles", 0)) break;
         HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr);
         DWORD pid = 0, tid = tray ? GetWindowThreadProcessId(tray, &pid) : 0;
         if (pid) {

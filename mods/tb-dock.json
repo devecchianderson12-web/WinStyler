@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "id": "tb-dock",
+  "name": "Barra tipo dock",
+  "category": "Barra de tareas",
+  "description": "Quita el fondo de lado a lado y deja solo un bloque detrás de los íconos, como un dock. Combínalo con «Bandeja en cápsula».",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "color",
+      "label": "Fondo del dock",
+      "type": "color",
+      "default": "#CC161A26"
+    },
+    {
+      "key": "gap",
+      "label": "Margen vertical",
+      "type": "number",
+      "min": 0,
+      "max": 10,
+      "step": 1,
+      "default": 3,
+      "unit": "px"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater",
+      "styles": [
+        "Background={color}",
+        "Margin=0,{gap},0,{gap}"
+      ]
+    }
+  ]
+}

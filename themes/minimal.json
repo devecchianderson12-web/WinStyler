@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "kind": "theme",
+  "id": "minimal",
+  "name": "Minimalista",
+  "description": "Barra compacta y transparente, menú Inicio simplificado, elementos innecesarios ocultos y colores discretos.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "settings_cfg": {
+    "tb_effect": "transparent",
+    "tb_stroke": "hide",
+    "tb_search": "hidden",
+    "tb_taskview": "hide",
+    "tb_widgets": "hide",
+    "tb_chat": "hide",
+    "tb_copilot": "hide",
+    "tb_size": "small",
+    "st_hide_rec": "on",
+    "st_suggestions": "off",
+    "st_web_search": "off",
+    "sm_effect": "default"
+  },
+  "preview": {
+    "bar": "#000000",
+    "bar_alpha": 0.0,
+    "menu": "#202020",
+    "menu_alpha": 0.95,
+    "accent": "#BBBBBB"
+  },
+  "mods": {
+    "sm-elements": {
+      "enabled": true,
+      "settings": {
+        "search": true,
+        "user": false,
+        "power": false,
+        "all_apps": false,
+        "headers": true,
+        "recommended": true
+      }
+    },
+    "sm-frame": {
+      "enabled": true,
+      "settings": {
+        "radius": 8,
+        "width": 0,
+        "color": "#00000000"
+      }
+    },
+    "tb-indicator": {
+      "enabled": true,
+      "settings": {
+        "color": "#AAFFFFFF",
+        "width": 4,
+        "height": 2
+      }
+    },
+    "tb-tray-hide": {
+      "enabled": true,
+      "settings": {
+        "bell": true,
+        "show_desktop": true,
+        "clock": false
+      }
+    }
+  }
+}

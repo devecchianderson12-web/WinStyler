@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "tb-tray-hide",
+  "name": "Ocultar elementos de la bandeja",
+  "category": "Bandeja del sistema",
+  "description": "Oculta la campana de notificaciones, la esquina «Mostrar escritorio» o el reloj.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "bell",
+      "label": "Campana de notificaciones",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "show_desktop",
+      "label": "Esquina «Mostrar escritorio»",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "clock",
+      "label": "Reloj y fecha",
+      "type": "bool",
+      "default": false
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "SystemTray.OmniButton#NotificationCenterButton",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "bell"
+    },
+    {
+      "process": "explorer",
+      "target": "SystemTray.Stack#ShowDesktopStack",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "show_desktop"
+    },
+    {
+      "process": "explorer",
+      "target": "SystemTray.DateTimeIconContent",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "clock"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "sm-frame",
+  "name": "Bordes y esquinas del menú",
+  "category": "Menú Inicio",
+  "description": "Radio de las esquinas, grosor y color del borde del menú Inicio.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "radius",
+      "label": "Radio",
+      "type": "number",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "default": 16,
+      "unit": "px"
+    },
+    {
+      "key": "width",
+      "label": "Grosor del borde",
+      "type": "number",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "default": 1,
+      "unit": "px"
+    },
+    {
+      "key": "color",
+      "label": "Color del borde",
+      "type": "color",
+      "default": "#447B6CF6"
+    }
+  ],
+  "rules": [
+    {
+      "process": "start",
+      "target": "Border#AcrylicBorder",
+      "styles": [
+        "CornerRadius={radius}",
+        "BorderThickness={width}",
+        "BorderBrush={color}"
+      ]
+    },
+    {
+      "process": "start",
+      "target": "Border#AcrylicOverlay, Border#DropShadow",
+      "styles": [
+        "CornerRadius={radius}"
+      ]
+    }
+  ]
+}

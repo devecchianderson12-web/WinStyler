@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "id": "tb-clock",
+  "name": "Reloj y fecha",
+  "category": "Bandeja del sistema",
+  "description": "Color, tamaño y grosor del reloj; opción de ocultar la fecha.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "color",
+      "label": "Color",
+      "type": "color",
+      "default": "#FFFFFFFF"
+    },
+    {
+      "key": "size",
+      "label": "Tamaño de la hora",
+      "type": "number",
+      "min": 10,
+      "max": 18,
+      "step": 1,
+      "default": 12,
+      "unit": "pt"
+    },
+    {
+      "key": "weight",
+      "label": "Grosor",
+      "type": "choice",
+      "options": [
+        [
+          "Normal",
+          "Normal"
+        ],
+        [
+          "SemiBold",
+          "Seminegrita"
+        ],
+        [
+          "Bold",
+          "Negrita"
+        ]
+      ],
+      "default": "SemiBold"
+    },
+    {
+      "key": "hide_date",
+      "label": "Ocultar la fecha",
+      "type": "bool",
+      "default": false
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "TextBlock#TimeInnerTextBlock",
+      "styles": [
+        "Foreground={color}",
+        "FontSize={size}",
+        "FontWeight={weight}"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "TextBlock#DateInnerTextBlock",
+      "styles": [
+        "Foreground={color}"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "TextBlock#DateInnerTextBlock",
+      "styles": [
+        "Visibility=Collapsed"
+      ],
+      "when": "hide_date"
+    }
+  ]
+}

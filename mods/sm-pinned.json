@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": "sm-pinned",
+  "name": "Anclados: filas y columnas",
+  "category": "Menú Inicio",
+  "description": "Cantidad de columnas y alto de la zona de aplicaciones ancladas.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "columns",
+      "label": "Columnas",
+      "type": "number",
+      "min": 3,
+      "max": 9,
+      "step": 1,
+      "default": 6,
+      "unit": ""
+    },
+    {
+      "key": "height",
+      "label": "Alto de la zona",
+      "type": "number",
+      "min": 168,
+      "max": 672,
+      "step": 84,
+      "default": 504,
+      "unit": "px"
+    }
+  ],
+  "rules": [
+    {
+      "process": "start",
+      "target": "GridView#PinnedList > ScrollViewer > Border > Grid > ScrollContentPresenter > ItemsPresenter > ItemsWrapGrid",
+      "styles": [
+        "MaximumRowsOrColumns={columns}"
+      ]
+    },
+    {
+      "process": "start",
+      "target": "StartMenu.PinnedList#StartMenuPinnedList, GridView#PinnedList",
+      "styles": [
+        "Height={height}"
+      ]
+    }
+  ]
+}

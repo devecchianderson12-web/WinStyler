@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "id": "sm-acrylic",
+  "name": "Fondo acrílico del menú",
+  "category": "Menú Inicio",
+  "description": "Acrílico real con el tinte, la opacidad y la luminosidad que elijas.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "tint",
+      "label": "Color del tinte",
+      "type": "color",
+      "default": "#0B1A3A"
+    },
+    {
+      "key": "tint_opacity",
+      "label": "Opacidad del tinte",
+      "type": "number",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 55,
+      "unit": "%"
+    },
+    {
+      "key": "luminosity",
+      "label": "Luminosidad",
+      "type": "number",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 20,
+      "unit": "%"
+    }
+  ],
+  "rules": [
+    {
+      "process": "start",
+      "target": "Border#AcrylicBorder",
+      "styles": [
+        "Background:=<AcrylicBrush BackgroundSource=\"HostBackdrop\" TintColor=\"{tint}\" TintOpacity=\"{tint_opacity/100}\" TintLuminosityOpacity=\"{luminosity/100}\" FallbackColor=\"{tint}\"/>"
+      ]
+    },
+    {
+      "process": "start",
+      "target": "Border#AcrylicOverlay",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    }
+  ]
+}

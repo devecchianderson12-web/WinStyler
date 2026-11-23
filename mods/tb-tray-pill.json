@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "id": "tb-tray-pill",
+  "name": "Bandeja en cápsula",
+  "category": "Bandeja del sistema",
+  "description": "Pone la bandeja del sistema (íconos, reloj) dentro de una cápsula con fondo propio.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "color",
+      "label": "Fondo",
+      "type": "color",
+      "default": "#CC161A26"
+    },
+    {
+      "key": "radius",
+      "label": "Radio",
+      "type": "number",
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "default": 12,
+      "unit": "px"
+    },
+    {
+      "key": "gap",
+      "label": "Margen vertical",
+      "type": "number",
+      "min": 0,
+      "max": 10,
+      "step": 1,
+      "default": 4,
+      "unit": "px"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "SystemTray.SystemTrayFrame > Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background={color}",
+        "CornerRadius={radius}",
+        "Margin=0,{gap},6,{gap}",
+        "Padding=6,0,6,0"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "ex-hide-gallery",
+  "name": "Quitar «Galería» del Explorador",
+  "category": "Explorador de archivos",
+  "description": "Oculta la entrada «Galería» del panel de navegación (Windows 11 23H2 o posterior).",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22621
+  },
+  "restart": "explorer",
+  "settings": [],
+  "rules": [],
+  "registry": [
+    {
+      "path": "HKCU\\Software\\Classes\\CLSID\\{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}",
+      "name": "System.IsPinnedToNameSpaceTree",
+      "type": "REG_DWORD",
+      "data": "0"
+    }
+  ]
+}

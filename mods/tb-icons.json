@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "id": "tb-icons",
+  "name": "Tamaño de íconos",
+  "category": "Barra de tareas",
+  "description": "Agranda o achica los íconos de las aplicaciones de la barra.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "size",
+      "label": "Tamaño",
+      "type": "number",
+      "min": 16,
+      "max": 32,
+      "step": 1,
+      "default": 24,
+      "unit": "px"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskListLabeledButtonPanel#IconPanel > Image#Icon",
+      "styles": [
+        "Width={size}",
+        "Height={size}"
+      ]
+    }
+  ]
+}

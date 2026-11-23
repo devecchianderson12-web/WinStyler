@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "kind": "theme",
+  "id": "win11-glass",
+  "name": "Windows 11 Glass",
+  "description": "Barra translúcida flotante, menú Inicio acrílico con esquinas redondeadas y sombras suaves.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "settings_cfg": {
+    "tb_effect": "default",
+    "tb_theme": "dark",
+    "transparency": "normal",
+    "sm_effect": "default"
+  },
+  "preview": {
+    "bar": "#1C2233",
+    "bar_alpha": 0.55,
+    "menu": "#1C2233",
+    "menu_alpha": 0.7,
+    "accent": "#7B6CF6"
+  },
+  "mods": {
+    "tb-floating": {
+      "enabled": true,
+      "settings": {
+        "radius": 12,
+        "side": 10,
+        "top": 3,
+        "bottom": 5
+      }
+    },
+    "tb-acrylic": {
+      "enabled": true,
+      "settings": {
+        "tint": "#1C2233",
+        "tint_opacity": 30,
+        "luminosity": 0
+      }
+    },
+    "tb-border": {
+      "enabled": true,
+      "settings": {
+        "color": "#33FFFFFF",
+        "width": 1
+      }
+    },
+    "sm-acrylic": {
+      "enabled": true,
+      "settings": {
+        "tint": "#1C2233",
+        "tint_opacity": 40,
+        "luminosity": 10
+      }
+    },
+    "sm-frame": {
+      "enabled": true,
+      "settings": {
+        "radius": 14,
+        "width": 1,
+        "color": "#33FFFFFF"
+      }
+    },
+    "tb-buttons": {
+      "enabled": true,
+      "settings": {
+        "radius": 8,
+        "gap": 1,
+        "hover": "#22FFFFFF",
+        "active": "#18FFFFFF"
+      }
+    }
+  }
+}

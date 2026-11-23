@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "id": "tb-border",
+  "name": "Borde de color",
+  "category": "Barra de tareas",
+  "description": "Dibuja un borde alrededor del fondo de la barra (ideal con la barra flotante).",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "color",
+      "label": "Color",
+      "type": "color",
+      "default": "#557B6CF6"
+    },
+    {
+      "key": "width",
+      "label": "Grosor",
+      "type": "number",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 1,
+      "unit": "px"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Stroke={color}",
+        "StrokeThickness={width}"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    }
+  ]
+}

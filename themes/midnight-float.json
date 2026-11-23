@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "kind": "theme",
+  "id": "midnight-float",
+  "name": "Midnight Float",
+  "description": "Inspirado en el menú azul medianoche: barra flotante de lado a lado, menú redondeado azul con botón de apagado circular y sin recomendados.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "settings_cfg": {
+    "tb_effect": "default",
+    "sm_effect": "default",
+    "tb_theme": "dark",
+    "st_hide_rec": "on"
+  },
+  "preview": {
+    "bar": "#0B1A3A",
+    "bar_alpha": 0.7,
+    "menu": "#0B1A3A",
+    "menu_alpha": 0.8,
+    "accent": "#4C8DFF"
+  },
+  "mods": {
+    "tb-floating": {
+      "enabled": true,
+      "settings": {
+        "radius": 14,
+        "side": 260,
+        "top": 2,
+        "bottom": 6
+      }
+    },
+    "tb-acrylic": {
+      "enabled": true,
+      "settings": {
+        "tint": "#0B1A3A",
+        "tint_opacity": 55,
+        "luminosity": 0
+      }
+    },
+    "sm-acrylic": {
+      "enabled": true,
+      "settings": {
+        "tint": "#0B1A3A",
+        "tint_opacity": 60,
+        "luminosity": 15
+      }
+    },
+    "sm-frame": {
+      "enabled": true,
+      "settings": {
+        "radius": 18,
+        "width": 1,
+        "color": "#3346A0FF"
+      }
+    },
+    "sm-power": {
+      "enabled": true,
+      "settings": {
+        "color": "#26FFFFFF"
+      }
+    },
+    "sm-elements": {
+      "enabled": true,
+      "settings": {
+        "search": true,
+        "user": false,
+        "power": false,
+        "all_apps": false,
+        "headers": false,
+        "recommended": true
+      }
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "id": "tb-acrylic",
+  "name": "Fondo acrílico / desenfoque",
+  "category": "Barra de tareas",
+  "description": "Reemplaza el fondo de la barra por un acrílico XAML real: desenfoca lo que hay detrás con el tinte y la intensidad que elijas.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "tint",
+      "label": "Color del tinte",
+      "type": "color",
+      "default": "#141824"
+    },
+    {
+      "key": "tint_opacity",
+      "label": "Opacidad del tinte",
+      "type": "number",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 35,
+      "unit": "%"
+    },
+    {
+      "key": "luminosity",
+      "label": "Luminosidad",
+      "type": "number",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 0,
+      "unit": "%"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill:=<AcrylicBrush BackgroundSource=\"Backdrop\" TintColor=\"{tint}\" TintOpacity=\"{tint_opacity/100}\" TintLuminosityOpacity=\"{luminosity/100}\" FallbackColor=\"{tint}\"/>"
+      ]
+    }
+  ]
+}

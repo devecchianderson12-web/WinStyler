@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "sys-snap-hover",
+  "name": "Sin diseños de ajuste al pasar el cursor",
+  "category": "Sistema",
+  "description": "Desactiva el menú de diseños de ajuste que aparece al pasar el cursor por maximizar.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "explorer",
+  "settings": [],
+  "rules": [],
+  "registry": [
+    {
+      "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+      "name": "EnableSnapAssistFlyout",
+      "type": "REG_DWORD",
+      "data": "0"
+    }
+  ]
+}

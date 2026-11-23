@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "ex-hide-home",
+  "name": "Quitar «Inicio» del Explorador",
+  "category": "Explorador de archivos",
+  "description": "Oculta la entrada «Inicio» (Home) del panel de navegación del Explorador.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "explorer",
+  "settings": [],
+  "rules": [],
+  "registry": [
+    {
+      "path": "HKCU\\Software\\Classes\\CLSID\\{f874310e-b6b7-47dc-bc84-b9e6b38f5903}",
+      "name": "System.IsPinnedToNameSpaceTree",
+      "type": "REG_DWORD",
+      "data": "0"
+    }
+  ]
+}

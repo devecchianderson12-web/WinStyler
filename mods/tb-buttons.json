@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "id": "tb-buttons",
+  "name": "Botones de aplicaciones",
+  "category": "Barra de tareas",
+  "description": "Esquinas, separación y color al pasar el cursor de los botones de la barra.",
+  "author": "WinStyler",
+  "version": "1.0",
+  "compat": {
+    "min_build": 22000
+  },
+  "restart": "none",
+  "settings": [
+    {
+      "key": "radius",
+      "label": "Radio de las esquinas",
+      "type": "number",
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "default": 8,
+      "unit": "px"
+    },
+    {
+      "key": "gap",
+      "label": "Separación",
+      "type": "number",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "default": 1,
+      "unit": "px"
+    },
+    {
+      "key": "hover",
+      "label": "Color al pasar el cursor",
+      "type": "color",
+      "default": "#337B6CF6"
+    },
+    {
+      "key": "active",
+      "label": "Color de la app activa",
+      "type": "color",
+      "default": "#227B6CF6"
+    }
+  ],
+  "rules": [
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskListLabeledButtonPanel#IconPanel > Border#BackgroundElement, Taskbar.TaskListButtonPanel > Border#BackgroundElement",
+      "styles": [
+        "CornerRadius={radius}"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskListButton#TaskListButton, Taskbar.ExperienceToggleButton#LaunchListButton",
+      "styles": [
+        "Margin={gap},0,{gap},0"
+      ]
+    },
+    {
+      "process": "explorer",
+      "target": "Taskbar.TaskListLabeledButtonPanel#IconPanel@CommonStates > Border#BackgroundElement",
+      "styles": [
+        "Background@InactivePointerOver={hover}",
+        "Background@ActivePointerOver={hover}",
+        "Background@ActiveNormal={active}"
+      ]
+    }
+  ]
+}

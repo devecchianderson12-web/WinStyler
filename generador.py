@@ -410,6 +410,7 @@ if ($mode -eq 'extras') {
 @@EXTRAS@@
 }
 if ($mode -eq 'effect' -or $mode -eq 'purge') {
+  # versiones anteriores dejaban un proceso residente (rundll32 ...,Keep): se detiene
   try { $ev = [System.Threading.EventWaitHandle]::OpenExisting('Local\WinStylerTBStop'); [void]$ev.Set(); Start-Sleep -Milliseconds 800 } catch {}
   Stop-Process -Name StartMenuExperienceHost -Force -ErrorAction SilentlyContinue
   Start-Sleep -Milliseconds 400
@@ -429,8 +430,9 @@ if ($mode -eq 'effect' -and $on) {
     for ($t = 0; $t -lt 25; $t++) { try { [IO.File]::WriteAllBytes($dll, $bytes); break } catch { Start-Sleep -Milliseconds 300 } }
   }
   if (Test-Path -LiteralPath $dll) {
-    New-ItemProperty -Path $runKey -Name 'WinStylerTB' -Value ('rundll32.exe "' + $dll + '",Keep') -PropertyType String -Force | Out-Null
-    Start-Process -FilePath 'rundll32.exe' -ArgumentList ('"' + $dll + '",Keep')
+    # carga única al iniciar sesión: rundll32 prepara barra y menú y termina enseguida
+    New-ItemProperty -Path $runKey -Name 'WinStylerTB' -Value ('rundll32.exe "' + $dll + '",Apply') -PropertyType String -Force | Out-Null
+    Start-Process -FilePath 'rundll32.exe' -ArgumentList ('"' + $dll + '",Apply')
   }
 }
 if (($mode -eq 'effect' -and -not $on) -or $mode -eq 'purge') {

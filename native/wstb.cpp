@@ -3,7 +3,7 @@
 //    Inicio) mediante la API de diagnóstico XAML (InitializeXamlDiagnosticsEx) y
 //    cambia propiedades de los elementos XAML.
 //  * Windows 10: la barra usa SetWindowCompositionAttribute.
-// Uso: rundll32.exe wstb.dll,Keep   (proceso residente que mantiene los efectos)
+// Uso: rundll32.exe wstb.dll,Apply  (carga única; no queda ningún proceso residente)
 // Configuración (DWORD) en HKCU\Software\WinStyler:
 //   Barra: TbEnabled, TbOpacity (0-100), TbTint, TbTint2, TbStroke
 //   Inicio: SmEnabled, SmOpacity, SmTint, SmTint2, SmCorner, SmScale (%), SmHeight,
@@ -629,6 +629,7 @@ struct Watcher : winrt::implements<Watcher, IVisualTreeServiceCallback2, winrt::
 };
 
 static winrt::com_ptr<Watcher> g_watcher;
+void StartExplorerService();
 
 struct Tap : winrt::implements<Tap, IObjectWithSite, winrt::non_agile> {
     winrt::com_ptr<IUnknown> site;
@@ -655,6 +656,7 @@ struct Tap : winrt::implements<Tap, IObjectWithSite, winrt::non_agile> {
             }
             g_watcher = winrt::make_self<Watcher>(site);
             g_watcher->Start();
+            if (!g_inStart) StartExplorerService();
             HANDLE th = CreateThread(nullptr, 0, RegWatchThread, nullptr, 0, nullptr);
             if (th) CloseHandle(th);
         } catch (...) {}
@@ -689,7 +691,10 @@ STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, LPVOID* ppv) {
 
 STDAPI DllCanUnloadNow() { return S_FALSE; }
 
-// ------------------------------------------------------------------ proceso residente
+// ------------------------------------------------------------------ carga sin procesos residentes
+// rundll32 wstb.dll,Apply  se ejecuta una vez (al aplicar y al iniciar sesión), carga la DLL
+// en el Explorador y termina. Desde dentro del Explorador un hilo vigila el menú Inicio y lo
+// vuelve a preparar si Windows lo reinicia. No queda ningún proceso propio en segundo plano.
 static DWORD OsBuild() {
     RTL_OSVERSIONINFOW vi{sizeof(vi)};
     using Fn = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
@@ -698,9 +703,7 @@ static DWORD OsBuild() {
     return 0;
 }
 
-static bool g_win11 = true;
-
-static HRESULT Inject(DWORD pid) {
+static HRESULT Inject(DWORD pid, const wchar_t* endpoint) {
     using Ixde = HRESULT(WINAPI*)(LPCWSTR, DWORD, LPCWSTR, LPCWSTR, CLSID, LPCWSTR);
     static Ixde ixde = nullptr;
     if (!ixde) {
@@ -711,8 +714,8 @@ static HRESULT Inject(DWORD pid) {
     }
     wchar_t path[MAX_PATH];
     GetModuleFileNameW(g_module, path, MAX_PATH);
-    HRESULT hr = ixde(L"VisualDiagConnection1", pid, nullptr, path, CLSID_WsTap, nullptr);
-    if (hr == E_INVALIDARG) hr = ixde(L"VisualDiagConnection1", pid, L"", path, CLSID_WsTap, nullptr);
+    HRESULT hr = ixde(endpoint, pid, nullptr, path, CLSID_WsTap, nullptr);
+    if (hr == E_INVALIDARG) hr = ixde(endpoint, pid, L"", path, CLSID_WsTap, nullptr);
     return hr;
 }
 
@@ -751,29 +754,6 @@ static void GrantAll() {
     GrantAppPackages(L"CURRENT_USER\\Software\\WinStyler", SE_REGISTRY_KEY, KEY_READ);
 }
 
-struct Target {
-    DWORD injected = 0;
-    volatile LONG busy = 0;
-    DWORD pid = 0;
-};
-static Target g_tbTarget, g_smTarget;
-
-static DWORD WINAPI InjectThread(LPVOID p) {
-    auto t = static_cast<Target*>(p);
-    // Si el proceso está suspendido (menú cerrado) la llamada espera a que se reanude.
-    if (SUCCEEDED(Inject(t->pid))) t->injected = t->pid;
-    InterlockedExchange(&t->busy, 0);
-    return 0;
-}
-
-static void Ensure(Target& t, DWORD pid) {
-    if (!pid || pid == t.injected) return;
-    if (InterlockedCompareExchange(&t.busy, 1, 0) != 0) return;
-    t.pid = pid;
-    HANDLE th = CreateThread(nullptr, 0, InjectThread, &t, 0, nullptr);
-    if (th) CloseHandle(th); else InterlockedExchange(&t.busy, 0);
-}
-
 static DWORD FindProcess(const wchar_t* exe) {
     DWORD session = 0, found = 0;
     ProcessIdToSessionId(GetCurrentProcessId(), &session);
@@ -791,6 +771,30 @@ static DWORD FindProcess(const wchar_t* exe) {
     return found;
 }
 
+// Pide a todos los programas que vuelvan a poner su ícono en la bandeja (Steam, Discord...).
+// Es el mismo aviso que manda Windows cuando arranca la barra; no cierra ni cambia nada.
+static void RefreshTrayIcons() {
+    static const UINT msg = RegisterWindowMessageW(L"TaskbarCreated");
+    if (msg) PostMessageW(HWND_BROADCAST, msg, 0, 0);
+}
+
+// Hilo dentro del Explorador (Windows 11): mantiene preparado el menú Inicio.
+static DWORD WINAPI ExplorerService(LPVOID) {
+    Sleep(4000);
+    RefreshTrayIcons();  // los íconos registrados mientras arrancaba la barra se recuperan
+    DWORD injected = 0;
+    for (;;) {
+        if (ReadSmCfg().enabled) {
+            DWORD pid = FindProcess(L"StartMenuExperienceHost.exe");
+            // Si el menú está suspendido la llamada espera a que se abra; es solo este hilo.
+            if (pid && pid != injected && SUCCEEDED(Inject(pid, L"WinStylerStartDiag"))) injected = pid;
+        }
+        Sleep(2000);
+    }
+}
+
+// ---------- Windows 10: la barra no es XAML; se usa SetWindowCompositionAttribute desde
+// dentro del Explorador (la DLL entra con un gancho de mensajes y queda fijada).
 struct AccentPolicy { int state; int flags; DWORD color; int anim; };
 struct WinCompAttrData { int attr; PVOID data; SIZE_T size; };
 using SwcaFn = BOOL(WINAPI*)(HWND, WinCompAttrData*);
@@ -808,9 +812,9 @@ static BOOL CALLBACK Win10Apply(HWND h, LPARAM lp) {
     return TRUE;
 }
 
-static void Win10Tick(const Cfg& c, bool off) {
+static void Win10Tick(const Cfg& c) {
     AccentPolicy ap{0, 0, 0, 0};
-    if (!off && c.enabled) {
+    if (c.enabled) {
         DWORD a = (c.opacity * 255 + 50) / 100;
         DWORD rgb = c.tint == NO_TINT ? 0 : c.tint;
         DWORD abgr = (a << 24) | ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF);
@@ -819,90 +823,67 @@ static void Win10Tick(const Cfg& c, bool off) {
     EnumWindows(Win10Apply, reinterpret_cast<LPARAM>(&ap));
 }
 
-// Pide a todos los programas que vuelvan a poner su ícono en la bandeja (Steam, Discord...).
-// Es el mismo aviso que manda Windows cuando arranca la barra; no cierra ni cambia nada.
-static void RefreshTrayIcons() {
-    static const UINT msg = RegisterWindowMessageW(L"TaskbarCreated");
-    if (msg) PostMessageW(HWND_BROADCAST, msg, 0, 0);
+static DWORD WINAPI Win10Service(LPVOID) {
+    bool was = false;
+    for (int n = 0;; ++n) {
+        static Cfg c;
+        if (n % 25 == 0) c = ReadCfg();  // la configuración se relee cada segundo
+        if (c.enabled || was) Win10Tick(c);
+        was = c.enabled != 0;
+        Sleep(40);
+    }
 }
 
-static DWORD g_trayNotified = 0;
+extern "C" LRESULT CALLBACK WsHook(int code, WPARAM w, LPARAM l) {
+    return CallNextHookEx(nullptr, code, w, l);
+}
 
-static LRESULT CALLBACK KeepProc(HWND h, UINT m, WPARAM w, LPARAM l) {
-    if (m == WM_TIMER && w == 2) {
-        KillTimer(h, 2);
-        RefreshTrayIcons();
-        return 0;
-    }
-    if (m == WM_TIMER) {
+static bool InExplorer() {
+    wchar_t exe[MAX_PATH] = L"";
+    GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    const wchar_t* name = wcsrchr(exe, L'\\');
+    return name && _wcsicmp(name + 1, L"explorer.exe") == 0;
+}
+
+extern "C" void CALLBACK Apply(HWND, HINSTANCE, LPSTR, int) {
+    HANDLE mtx = CreateMutexW(nullptr, TRUE, L"Local\\WinStylerApply");
+    if (!mtx || GetLastError() == ERROR_ALREADY_EXISTS) return;
+    bool win11 = OsBuild() >= 22000;
+    if (win11) GrantAll();
+    // Espera a la barra (al iniciar sesión el Explorador tarda unos segundos).
+    for (int i = 0; i < 90; ++i) {
         Cfg c = ReadCfg();
-        bool sm = ReadSmCfg().enabled != 0;
-        if (!c.enabled && !sm) {
-            if (!g_win11) Win10Tick(c, true);
-            PostQuitMessage(0);
-            return 0;
-        }
-        if (!g_win11) {
-            Win10Tick(c, false);
-            return 0;
-        }
-        if (w == 1) {
-            if (c.enabled) {
-                HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr);
-                DWORD pid = 0;
-                if (tray) GetWindowThreadProcessId(tray, &pid);
-                Ensure(g_tbTarget, pid);
-                // Barra nueva (inicio de sesión, reinicio o cierre inesperado del Explorador):
-                // los íconos que se registraron mientras arrancaba se pierden; se recuperan.
-                if (g_tbTarget.injected && g_tbTarget.injected != g_trayNotified) {
-                    g_trayNotified = g_tbTarget.injected;
-                    SetTimer(h, 2, 4000, nullptr);
+        if (!c.enabled && !ReadSmCfg().enabled) break;
+        HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr);
+        DWORD pid = 0, tid = tray ? GetWindowThreadProcessId(tray, &pid) : 0;
+        if (pid) {
+            if (win11) {
+                if (SUCCEEDED(Inject(pid, L"VisualDiagConnection1"))) break;
+            } else {
+                if (!c.enabled) break;
+                HHOOK hook = SetWindowsHookExW(WH_GETMESSAGE, WsHook, g_module, tid);
+                if (hook) {
+                    PostMessageW(tray, WM_NULL, 0, 0);
+                    Sleep(1500);
+                    UnhookWindowsHookEx(hook);  // la DLL ya quedó fijada dentro del Explorador
+                    break;
                 }
             }
-            if (sm) Ensure(g_smTarget, FindProcess(L"StartMenuExperienceHost.exe"));
         }
-        return 0;
+        Sleep(1000);
     }
-    return DefWindowProcW(h, m, w, l);
-}
-
-extern "C" void CALLBACK Keep(HWND, HINSTANCE, LPSTR, int) {
-    HANDLE mtx = CreateMutexW(nullptr, TRUE, L"Local\\WinStylerTBKeeper");
-    if (!mtx || GetLastError() == ERROR_ALREADY_EXISTS) return;
-    HANDLE stop = CreateEventW(nullptr, TRUE, FALSE, L"Local\\WinStylerTBStop");
-    if (stop) ResetEvent(stop);
-    g_win11 = OsBuild() >= 22000;
-    if (g_win11) GrantAll();
-
-    WNDCLASSW wc{};
-    wc.lpfnWndProc = KeepProc;
-    wc.hInstance = g_module;
-    wc.lpszClassName = L"WinStylerTBKeeper";
-    RegisterClassW(&wc);
-    HWND h = CreateWindowExW(WS_EX_TOOLWINDOW, wc.lpszClassName, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, g_module, nullptr);
-    SetTimer(h, 1, g_win11 ? 2000 : 40, nullptr);
-    PostMessageW(h, WM_TIMER, 1, 0);
-
-    bool run = true;
-    while (run) {
-        DWORD r = MsgWaitForMultipleObjects(stop ? 1 : 0, &stop, FALSE, INFINITE, QS_ALLINPUT);
-        if (stop && r == WAIT_OBJECT_0) {
-            if (!g_win11) Win10Tick(ReadCfg(), true);
-            break;
-        }
-        MSG msg;
-        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            if (msg.message == WM_QUIT) { run = false; break; }
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-    }
-    if (h) DestroyWindow(h);
-    if (stop) CloseHandle(stop);
     ReleaseMutex(mtx);
     CloseHandle(mtx);
-    // Los hilos de inyección pueden seguir esperando un proceso suspendido.
-    ExitProcess(0);
+}
+
+// Compatibilidad con versiones anteriores, que registraban ",Keep" al iniciar sesión.
+extern "C" void CALLBACK Keep(HWND h, HINSTANCE i, LPSTR c, int s) { Apply(h, i, c, s); }
+
+void StartExplorerService() {
+    static LONG once = 0;
+    if (InterlockedExchange(&once, 1)) return;
+    HANDLE th = CreateThread(nullptr, 0, ExplorerService, nullptr, 0, nullptr);
+    if (th) CloseHandle(th);
 }
 
 BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID) {
@@ -910,6 +891,16 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID) {
         g_module = mod;
         g_runMsg = RegisterWindowMessageW(L"WinStyler_RunOnThread");
         DisableThreadLibraryCalls(mod);
+        if (InExplorer() && OsBuild() < 22000) {
+            HANDLE m = CreateMutexW(nullptr, FALSE, L"Local\\WinStylerWin10");
+            if (m && GetLastError() != ERROR_ALREADY_EXISTS) {
+                HMODULE self = nullptr;
+                GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                                   reinterpret_cast<LPCWSTR>(&CLSID_WsTap), &self);
+                HANDLE th = CreateThread(nullptr, 0, Win10Service, nullptr, 0, nullptr);
+                if (th) CloseHandle(th);
+            }
+        }
     }
     return TRUE;
 }

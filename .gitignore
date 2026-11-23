@@ -1,0 +1,19 @@
+# Resultados de compilación
+WinStyler.exe
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+
+# Módulo nativo: lo compila native/compilar_dll.bat (y GitHub Actions)
+native/*.dll
+native/*.obj
+native/*.exp
+native/*.lib
+native/*.pdb
+
+# .bat generados por la aplicación y perfiles personales
+aplicar_estilo.bat
+restaurar_original.bat
+winstyler_perfil.json

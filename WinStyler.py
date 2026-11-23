@@ -1414,8 +1414,8 @@ class App:
         self._choice(p, "tb_stroke")
         p.note("«Transparente» deja solo los íconos flotando sobre el fondo. La opacidad vale para «Translúcida», "
                "«Color sólido» y «Degradado». "
-               "Esto lo hace un módulo pequeño (wstb.dll) que se guarda en %LOCALAPPDATA%\\WinStyler y se inicia con "
-               "Windows para mantener el efecto; «Predeterminado de Windows» o «Restaurar original» lo quitan.")
+               "Esto lo hace un módulo pequeño (wstb.dll) que se guarda en %LOCALAPPDATA%\\WinStyler y se carga una vez al iniciar sesión dentro del Explorador, sin procesos en segundo plano. "
+               "«Predeterminado de Windows» o «Restaurar original» lo quitan.")
 
         p = Panel(f, "Tema y color")
         p.pack(fill="x", pady=(0, 12))

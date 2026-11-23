@@ -1,0 +1,4 @@
+# Dependencias para compilar WinStyler.exe (la aplicación solo usa la biblioteca estándar).
+pyinstaller==6.22.3
+# Solo para regenerar assets/ con assets/crear_icono.py:
+# pillow

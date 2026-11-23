@@ -787,7 +787,16 @@ static DWORD WINAPI ExplorerService(LPVOID) {
         if (ReadSmCfg().enabled) {
             DWORD pid = FindProcess(L"StartMenuExperienceHost.exe");
             // Si el menú está suspendido la llamada espera a que se abra; es solo este hilo.
-            if (pid && pid != injected && SUCCEEDED(Inject(pid, L"WinStylerStartDiag"))) injected = pid;
+            // La API solo acepta los nombres de conexión estándar: se prueba el primero libre.
+            if (pid && pid != injected) {
+                wchar_t ep[40];
+                for (int k = 1; k <= 5; ++k) {
+                    swprintf_s(ep, L"VisualDiagConnection%d", k);
+                    HRESULT hr = Inject(pid, ep);
+                    if (SUCCEEDED(hr)) { injected = pid; break; }
+                    if (hr != HRESULT_FROM_WIN32(ERROR_NOT_FOUND)) break;
+                }
+            }
         }
         Sleep(2000);
     }
